@@ -18,7 +18,6 @@ module.exports = {
   uploadDir: process.env.UPLOAD_DIR || '/uploads',
   uploadUrlBase: process.env.UPLOAD_URL_BASE || '/uploads',
   clientDir: path.join(__dirname, '..', 'client'),
-  superAdminName: process.env.SUPER_ADMIN_NAME || 'Super Admin',
   superAdminEmail: process.env.SUPER_ADMIN_EMAIL || '',
   superAdminPassword: process.env.SUPER_ADMIN_PASSWORD || ''
 };

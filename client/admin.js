@@ -218,16 +218,26 @@ async function submitKit(event) {
   const form = event.currentTarget;
   const data = new FormData(form);
 
-  const payload = {
-    name: data.get('name')?.toString().trim(),
-    type: data.get('type')?.toString(),
-    price: Number(data.get('price')),
-    difficulty: data.get('difficulty')?.toString(),
-    requires_technician: data.get('requires_technician') === 'on',
-    description: data.get('description')?.toString().trim() || ''
-  };
+  let imageUrl = '';
 
   try {
+    const image = data.get('image');
+    if (image && image.size > 0) {
+      imageUrl = await uploadImage(image);
+    }
+
+    const payload = {
+      name: data.get('name')?.toString().trim(),
+      type: data.get('type')?.toString(),
+      price: Number(data.get('price')),
+      difficulty: data.get('difficulty')?.toString(),
+      requires_technician: data.get('requires_technician') === 'on',
+      description: data.get('description')?.toString().trim() || '',
+      instructions: data.get('instructions')?.toString().trim() || '',
+      image_url: imageUrl || null,
+      video_url: data.get('video_url')?.toString().trim() || null
+    };
+
     await apiFetch('/admin/kit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -333,13 +343,16 @@ function renderKitsTable() {
         <td>$${Number(kit.price).toFixed(2)}</td>
         <td>${kit.difficulty}</td>
         <td>${kit.requires_technician ? 'Yes' : 'No'}</td>
+        <td>${kit.instructions ? 'Included' : '-'}</td>
+        <td>${kit.image_url ? `<a href="${kit.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
+        <td>${kit.video_url ? `<a href="${kit.video_url}" target="_blank" rel="noopener noreferrer">Video</a>` : '-'}</td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('kits-table-wrap').innerHTML = state.kits.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Difficulty</th><th>Technician</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No kits found.</p>';
 }
 

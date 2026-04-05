@@ -3,7 +3,40 @@ const { query } = require('../models/db');
 
 router.get('/kits', async (_req, res) => {
   try {
-    const result = await query('SELECT * FROM kits ORDER BY id ASC;');
+    const result = await query(
+      `
+      SELECT
+        k.id,
+        k.name,
+        k.type,
+        k.price,
+        k.difficulty,
+        k.requires_technician,
+        k.description,
+        k.instructions,
+        k.image_url,
+        k.video_url,
+        k.created_at,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', ks.id,
+              'step_number', ks.step_number,
+              'title', ks.title,
+              'description', ks.description,
+              'image_url', ks.image_url
+            )
+            ORDER BY ks.step_number
+          ) FILTER (WHERE ks.id IS NOT NULL),
+          '[]'::json
+        ) AS steps
+      FROM kits k
+      LEFT JOIN kit_steps ks ON ks.kit_id = k.id
+      GROUP BY k.id
+      ORDER BY k.id ASC;
+      `
+    );
+
     return res.json({ success: true, kits: result.rows });
   } catch (error) {
     console.error('[GET /kits] Failed:', error.message);

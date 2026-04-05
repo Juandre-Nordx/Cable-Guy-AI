@@ -87,7 +87,7 @@ async function deleteProduct(req, res) {
 
 async function createKit(req, res) {
   try {
-    const { name, type, price, difficulty, requires_technician, description } = req.body || {};
+    const { name, type, price, difficulty, requires_technician, description, instructions, image_url, video_url } = req.body || {};
 
     if (
       !requiredString(name) ||
@@ -104,11 +104,21 @@ async function createKit(req, res) {
 
     const result = await query(
       `
-      INSERT INTO kits (name, type, price, difficulty, requires_technician, description)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO kits (name, type, price, difficulty, requires_technician, description, instructions, image_url, video_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *;
       `,
-      [name.trim(), type, price, difficulty.trim(), requires_technician, description?.trim() || '']
+      [
+        name.trim(),
+        type,
+        price,
+        difficulty.trim(),
+        requires_technician,
+        description?.trim() || '',
+        instructions?.trim() || '',
+        image_url?.trim() || null,
+        video_url?.trim() || null
+      ]
     );
 
     return res.status(201).json({ success: true, kit: result.rows[0] });

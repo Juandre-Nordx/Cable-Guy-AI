@@ -377,3 +377,102 @@ label {
     height: auto;
   }
 }
+
+.kit-card-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.guide-label {
+  display: inline-block;
+  margin: 0.2rem 0;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.kit-details {
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.85rem;
+}
+
+.kit-main-image,
+.kit-step img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.kit-steps {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.kit-step {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem;
+  background: #f8fafc;
+}
+
+.kit-step h5 {
+  margin: 0 0 0.45rem;
+}
+
+.kit-video iframe {
+  width: 100%;
+  min-height: 220px;
+  border: 0;
+  border-radius: 10px;
+}
+
+.wizard-result {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.admin-order-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.order-notes-panel {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.order-notes-feed {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.order-note {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  gap: 0.25rem;
+  background: #f8fafc;
+}
+
+.order-note.admin {
+  border-left: 4px solid #1d4ed8;
+}
+
+.order-note.user {
+  border-left: 4px solid #0f766e;
+}
+
+.order-note-form {
+  display: grid;
+  gap: 0.45rem;
+}

@@ -9,6 +9,7 @@ const {
   updateProduct,
   deleteProduct,
   createKit,
+  createService,
   listUsers,
   dashboard,
   uploadImage
@@ -52,6 +53,7 @@ router.post('/product', createProduct);
 router.put('/product/:id', updateProduct);
 router.delete('/product/:id', deleteProduct);
 router.post('/kit', createKit);
+router.post('/service', createService);
 router.post('/upload', upload.single('image'), uploadImage);
 
 module.exports = router;

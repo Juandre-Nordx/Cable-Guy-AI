@@ -21,4 +21,15 @@ router.get('/products', async (_req, res) => {
   }
 });
 
+
+router.get('/services', async (_req, res) => {
+  try {
+    const result = await query('SELECT * FROM services ORDER BY id DESC;');
+    return res.json({ success: true, services: result.rows });
+  } catch (error) {
+    console.error('[GET /services] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load services.' });
+  }
+});
+
 module.exports = router;

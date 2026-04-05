@@ -1,29 +1,63 @@
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  cost NUMERIC(10,2) NOT NULL CHECK (cost >= 0),
+  description TEXT NOT NULL DEFAULT '',
+  image_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS kits (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL UNIQUE,
-  description TEXT NOT NULL,
-  price NUMERIC(10,2) NOT NULL,
-  difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium'))
+  type TEXT NOT NULL UNIQUE CHECK (type IN ('home', 'bridge', 'cctv', 'business')),
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  difficulty TEXT NOT NULL,
+  requires_technician BOOLEAN NOT NULL DEFAULT FALSE,
+  description TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS kit_items (
+  id SERIAL PRIMARY KEY,
+  kit_id INTEGER NOT NULL REFERENCES kits(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  UNIQUE (kit_id, product_id)
 );
 
 CREATE TABLE IF NOT EXISTS bookings (
   id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kit_id INTEGER REFERENCES kits(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
   address TEXT NOT NULL,
-  kit_id INTEGER REFERENCES kits(id),
-  status TEXT NOT NULL DEFAULT 'pending'
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'done')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO kits(name, type, description, price, difficulty)
+INSERT INTO kits (name, type, price, difficulty, requires_technician, description)
 VALUES
-  ('Home WiFi Kit', 'home', 'Dual-node mesh kit for apartments and homes with dead zones.', 199.99, 'easy'),
-  ('Bridge Kit', 'bridge', 'Point-to-point bridge kit to connect detached buildings or garages.', 299.00, 'medium'),
-  ('Business Network Kit', 'business', 'Router + managed switch + access points for multi-user environments.', 549.00, 'medium')
-ON CONFLICT(type) DO UPDATE
+  ('Home WiFi Kit', 'home', 199.99, 'easy', false, 'Dual-node mesh kit for apartments and homes with dead zones.'),
+  ('Bridge Kit', 'bridge', 299.00, 'medium', true, 'Point-to-point bridge kit to connect detached buildings or garages.'),
+  ('CCTV Kit', 'cctv', 399.00, 'medium', true, 'CCTV package with NVR and PoE cameras for secure monitoring.'),
+  ('Business Network Kit', 'business', 549.00, 'medium', true, 'Router + managed switch + APs for multi-user environments.')
+ON CONFLICT (type) DO UPDATE
 SET
   name = EXCLUDED.name,
-  description = EXCLUDED.description,
   price = EXCLUDED.price,
-  difficulty = EXCLUDED.difficulty;
+  difficulty = EXCLUDED.difficulty,
+  requires_technician = EXCLUDED.requires_technician,
+  description = EXCLUDED.description;

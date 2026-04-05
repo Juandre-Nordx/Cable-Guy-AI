@@ -17,8 +17,57 @@
     </header>
 
     <main class="narrow">
-      <section class="chat-shell card">
-        <h1>AI WiFi Diagnosis</h1>
+      <section id="wizard-shell" class="card">
+        <h1>Cable Guy AI Wizard</h1>
+        <p class="subtext">Answer a few quick questions and we will point you to the right kit.</p>
+
+        <form id="wizard-form" class="stack-form">
+          <label>
+            What is your problem?
+            <select name="problem" required>
+              <option value="wifi_coverage">WiFi coverage</option>
+              <option value="slow_internet">Slow internet</option>
+              <option value="between_buildings">Need connection between buildings</option>
+              <option value="security">Security</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label>
+            Property type
+            <select name="property_type" required>
+              <option value="small_home">Small home</option>
+              <option value="large_home">Large home</option>
+              <option value="office">Office</option>
+              <option value="multiple_buildings">Multiple buildings</option>
+            </select>
+          </label>
+
+          <label>
+            Distance issue?
+            <select name="distance" required>
+              <option value="same_room">Same room</option>
+              <option value="different_rooms">Different rooms</option>
+              <option value="separate_building">Separate building</option>
+            </select>
+          </label>
+
+          <label>
+            Do you want to install yourself?
+            <select name="self_install" required>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+
+          <button id="wizard-submit" class="button primary" type="submit">Get Recommendation</button>
+        </form>
+
+        <div id="wizard-result" class="hidden wizard-result"></div>
+      </section>
+
+      <section id="chat-shell" class="chat-shell card hidden">
+        <h2>AI WiFi Diagnosis</h2>
         <p class="subtext">Describe your issue. The assistant will ask follow-up questions and recommend a next step.</p>
 
         <div id="chat" class="chat-log"></div>

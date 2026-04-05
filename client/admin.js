@@ -140,7 +140,23 @@ function renderOrdersTable() {
           </select>
         </td>
         <td>${new Date(order.created_at).toLocaleString()}</td>
-        <td><button class="button secondary" data-update-order="${order.id}">Update</button></td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" data-update-order="${order.id}">Update</button>
+            <button class="button secondary" data-toggle-notes="${order.id}">Notes</button>
+          </div>
+        </td>
+      </tr>
+      <tr id="order-notes-row-${order.id}" class="hidden">
+        <td colspan="6">
+          <div class="order-notes-panel">
+            <div id="order-notes-${order.id}" class="order-notes-feed subtext">Loading notes...</div>
+            <form class="order-note-form" data-order-note-form="${order.id}">
+              <textarea name="message" rows="2" placeholder="Add note"></textarea>
+              <button class="button primary" type="submit">Save Note</button>
+            </form>
+          </div>
+        </td>
       </tr>
     `
     )
@@ -172,6 +188,70 @@ function renderOrdersTable() {
       }
     });
   });
+
+  document.querySelectorAll('[data-toggle-notes]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const orderId = button.dataset.toggleNotes;
+      const row = document.getElementById(`order-notes-row-${orderId}`);
+      const hidden = row.classList.contains('hidden');
+      row.classList.toggle('hidden', !hidden);
+      button.textContent = hidden ? 'Hide Notes' : 'Notes';
+
+      if (hidden) {
+        await loadAdminOrderNotes(orderId);
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-order-note-form]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const orderId = form.dataset.orderNoteForm;
+      const message = form.querySelector('textarea[name="message"]')?.value?.trim();
+      if (!message) return;
+
+      try {
+        await apiFetch(`/admin/orders/${orderId}/note`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+
+        form.reset();
+        await loadAdminOrderNotes(orderId);
+        setGlobalMessage(`Note added to order #${orderId}.`, 'success');
+      } catch (error) {
+        setGlobalMessage(error.message, 'warning');
+      }
+    });
+  });
+}
+
+async function loadAdminOrderNotes(orderId) {
+  const notesContainer = document.getElementById(`order-notes-${orderId}`);
+  if (!notesContainer) return;
+
+  try {
+    const payload = await apiFetch(`/orders/${orderId}/notes`);
+    if (!payload.notes.length) {
+      notesContainer.innerHTML = '<p class="subtext">No notes yet.</p>';
+      return;
+    }
+
+    notesContainer.innerHTML = payload.notes
+      .map(
+        (note) => `
+          <p class="order-note ${note.created_by === 'admin' ? 'admin' : 'user'}">
+            <strong>[${note.created_by === 'admin' ? 'Admin' : 'User'}]</strong>
+            ${note.message}
+            <span class="subtext">${new Date(note.created_at).toLocaleString()}</span>
+          </p>
+        `
+      )
+      .join('');
+  } catch (error) {
+    notesContainer.innerHTML = `<p class="warning">${error.message}</p>`;
+  }
 }
 
 async function submitProduct(event) {
@@ -218,16 +298,26 @@ async function submitKit(event) {
   const form = event.currentTarget;
   const data = new FormData(form);
 
-  const payload = {
-    name: data.get('name')?.toString().trim(),
-    type: data.get('type')?.toString(),
-    price: Number(data.get('price')),
-    difficulty: data.get('difficulty')?.toString(),
-    requires_technician: data.get('requires_technician') === 'on',
-    description: data.get('description')?.toString().trim() || ''
-  };
+  let imageUrl = '';
 
   try {
+    const image = data.get('image');
+    if (image && image.size > 0) {
+      imageUrl = await uploadImage(image);
+    }
+
+    const payload = {
+      name: data.get('name')?.toString().trim(),
+      type: data.get('type')?.toString(),
+      price: Number(data.get('price')),
+      difficulty: data.get('difficulty')?.toString(),
+      requires_technician: data.get('requires_technician') === 'on',
+      description: data.get('description')?.toString().trim() || '',
+      instructions: data.get('instructions')?.toString().trim() || '',
+      image_url: imageUrl || null,
+      video_url: data.get('video_url')?.toString().trim() || null
+    };
+
     await apiFetch('/admin/kit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -333,13 +423,16 @@ function renderKitsTable() {
         <td>$${Number(kit.price).toFixed(2)}</td>
         <td>${kit.difficulty}</td>
         <td>${kit.requires_technician ? 'Yes' : 'No'}</td>
+        <td>${kit.instructions ? 'Included' : '-'}</td>
+        <td>${kit.image_url ? `<a href="${kit.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
+        <td>${kit.video_url ? `<a href="${kit.video_url}" target="_blank" rel="noopener noreferrer">Video</a>` : '-'}</td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('kits-table-wrap').innerHTML = state.kits.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Difficulty</th><th>Technician</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No kits found.</p>';
 }
 

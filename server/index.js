@@ -29,6 +29,7 @@ app.use('/admin', adminRoutes);
 app.use('/orders', orderRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/chat', chatRoutes);
+app.use('/ai', chatRoutes);
 app.use('/', publicRoutes);
 
 app.get('*', (req, res) => {

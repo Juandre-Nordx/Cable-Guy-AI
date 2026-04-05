@@ -31,9 +31,25 @@ CREATE TABLE IF NOT EXISTS kits (
   difficulty TEXT NOT NULL,
   requires_technician BOOLEAN NOT NULL DEFAULT FALSE,
   description TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL DEFAULT '',
+  image_url TEXT,
+  video_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS instructions TEXT NOT NULL DEFAULT '';
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS video_url TEXT;
+
+CREATE TABLE IF NOT EXISTS kit_steps (
+  id SERIAL PRIMARY KEY,
+  kit_id INTEGER NOT NULL REFERENCES kits(id) ON DELETE CASCADE,
+  step_number INTEGER NOT NULL CHECK (step_number > 0),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  image_url TEXT,
+  UNIQUE (kit_id, step_number)
+);
 
 CREATE TABLE IF NOT EXISTS services (
   id SERIAL PRIMARY KEY,
@@ -56,6 +72,15 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kit_id INTEGER REFERENCES kits(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'placed' CHECK (status IN ('placed', 'processing', 'out_for_delivery', 'delivered', 'done')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+CREATE TABLE IF NOT EXISTS order_notes (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  created_by TEXT NOT NULL CHECK (created_by IN ('admin', 'user')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

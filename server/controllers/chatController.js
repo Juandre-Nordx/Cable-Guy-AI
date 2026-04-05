@@ -7,6 +7,10 @@ const {
   detectRecommendedKit
 } = require('../utils/ai');
 
+const WIZARD_PROBLEMS = ['wifi_coverage', 'slow_internet', 'between_buildings', 'security', 'other'];
+const WIZARD_PROPERTY_TYPES = ['small_home', 'large_home', 'office', 'multiple_buildings'];
+const WIZARD_DISTANCES = ['same_room', 'different_rooms', 'separate_building'];
+
 const systemPrompt = `You are Cable Guy AI, a professional network technician.
 
 You must:
@@ -61,6 +65,62 @@ async function callOllama(userMessage) {
   }
 }
 
+function mapWizardRecommendation({ problem, property_type, distance, self_install }) {
+  let recommendedKitType = 'home';
+
+  if (problem === 'security') {
+    recommendedKitType = 'cctv';
+  } else if (distance === 'separate_building' || property_type === 'multiple_buildings' || problem === 'between_buildings') {
+    recommendedKitType = 'bridge';
+  } else if (property_type === 'office') {
+    recommendedKitType = 'business';
+  }
+
+  const complexSetup =
+    recommendedKitType === 'bridge' ||
+    recommendedKitType === 'business' ||
+    property_type === 'large_home' ||
+    distance === 'separate_building';
+
+  const needsTechnician = !self_install || complexSetup;
+
+  const reasons = [];
+  if (recommendedKitType === 'bridge') reasons.push('long-distance or separate-building connectivity');
+  if (recommendedKitType === 'cctv') reasons.push('security monitoring needs');
+  if (recommendedKitType === 'business') reasons.push('office-grade network capacity');
+  if (recommendedKitType === 'home') reasons.push('home WiFi coverage optimization');
+
+  return {
+    recommendedKitType,
+    needsTechnician,
+    message: `Based on your answers, we recommend the ${recommendedKitType} kit for ${reasons[0]}.`
+  };
+}
+
+async function wizard(req, res) {
+  try {
+    const { problem, property_type, distance, self_install } = req.body || {};
+
+    if (
+      !WIZARD_PROBLEMS.includes(problem) ||
+      !WIZARD_PROPERTY_TYPES.includes(property_type) ||
+      !WIZARD_DISTANCES.includes(distance) ||
+      typeof self_install !== 'boolean'
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'problem, property_type, distance, and self_install are required with valid values.'
+      });
+    }
+
+    const recommendation = mapWizardRecommendation({ problem, property_type, distance, self_install });
+    return res.json({ success: true, ...recommendation });
+  } catch (error) {
+    console.error('[POST /chat/wizard] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to evaluate wizard answers.' });
+  }
+}
+
 async function chat(req, res) {
   try {
     const message = req.body?.message;
@@ -90,6 +150,7 @@ async function chat(req, res) {
       success: true,
       reply: aiReply,
       kit,
+      recommendedKit: kit,
       needsTechnician
     });
   } catch (error) {
@@ -101,4 +162,4 @@ async function chat(req, res) {
   }
 }
 
-module.exports = { chat };
+module.exports = { chat, wizard };

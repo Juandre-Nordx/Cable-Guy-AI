@@ -24,7 +24,7 @@ form.addEventListener('submit', async (event) => {
     saveSession(payload.token, payload.user);
     result.className = 'success';
     result.textContent = 'Login successful. Redirecting...';
-    window.location.href = payload.user.role === 'admin' ? '/admin.html' : '/dashboard.html';
+    redirectAfterAuth(payload);
   } catch (error) {
     result.className = 'warning';
     result.textContent = error.message;

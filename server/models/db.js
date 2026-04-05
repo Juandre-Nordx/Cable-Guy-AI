@@ -15,31 +15,45 @@ const pool = new Pool({
 
 const query = (text, params = []) => pool.query(text, params);
 
+async function createDefaultAdmin() {
+  const email = String(config.superAdminEmail || '')
+    .trim()
+    .toLowerCase();
+  const password = String(config.superAdminPassword || '').trim();
+
+  if (!email || !password) {
+    console.log('[DB] SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD not set. Skipping default admin creation.');
+    return;
+  }
+
+  const existing = await query('SELECT id FROM users WHERE email = $1 LIMIT 1;', [email]);
+  if (existing.rows[0]) {
+    console.log('[DB] Super admin exists');
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await query(
+    `
+    INSERT INTO users (name, contact_number, email, address, password, role)
+    VALUES ($1, $2, $3, $4, $5, 'admin');
+    `,
+    ['Super Admin', '', email, '', passwordHash]
+  );
+
+  console.log('[DB] Super admin created');
+}
+
 async function initializeDatabase() {
   const schemaPath = path.join(__dirname, '..', '..', 'db', 'schema.sql');
   const schemaSql = await fs.readFile(schemaPath, 'utf-8');
   await query(schemaSql);
-
-  if (config.superAdminEmail && config.superAdminPassword) {
-    const passwordHash = await bcrypt.hash(config.superAdminPassword, 12);
-    await query(
-      `
-      INSERT INTO users (name, email, password, role)
-      VALUES ($1, $2, $3, 'admin')
-      ON CONFLICT (email)
-      DO UPDATE SET
-        name = EXCLUDED.name,
-        password = EXCLUDED.password,
-        role = 'admin';
-      `,
-      [config.superAdminName, config.superAdminEmail.toLowerCase(), passwordHash]
-    );
-    console.log('[DB] Super admin upserted:', config.superAdminEmail);
-  }
+  await createDefaultAdmin();
 }
 
 module.exports = {
   pool,
   query,
-  initializeDatabase
+  initializeDatabase,
+  createDefaultAdmin
 };

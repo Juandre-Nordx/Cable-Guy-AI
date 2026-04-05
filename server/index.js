@@ -8,6 +8,7 @@ const { initializeDatabase } = require('./models/db');
 
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const publicRoutes = require('./routes/publicRoutes');
@@ -25,6 +26,7 @@ app.use(express.static(config.clientDir));
 
 app.use('/auth', authRoutes);
 app.use('/admin', adminRoutes);
+app.use('/orders', orderRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/chat', chatRoutes);
 app.use('/', publicRoutes);

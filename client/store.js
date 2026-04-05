@@ -12,15 +12,43 @@ function renderKit(kit) {
     <p><strong>Type:</strong> ${kit.type}</p>
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
     <p><strong>Price:</strong> $${Number(kit.price).toFixed(2)}</p>
-    <button class="button primary" data-kit-id="${kit.id}">Buy Now</button>
+    <button class="button primary" data-kit-id="${kit.id}">Buy Kit</button>
   `;
 
   const buyButton = card.querySelector('button');
-  buyButton?.addEventListener('click', () => {
-    window.alert(`Checkout placeholder for ${kit.name}. Connect this to Stripe or your payment provider.`);
-  });
+  buyButton?.addEventListener('click', () => placeOrder(kit.id, kit.name));
 
   return card;
+}
+
+async function placeOrder(kitId, kitName) {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  try {
+    const response = await fetch('/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ kit_id: kitId })
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to place order.');
+    }
+
+    window.alert(`Order placed for ${kitName}. Tracking is available on your dashboard.`);
+    window.location.href = '/dashboard.html';
+  } catch (error) {
+    window.alert(error.message);
+  }
 }
 
 async function loadKits() {

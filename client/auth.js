@@ -17,6 +17,15 @@ function saveSession(token, user) {
   localStorage.setItem('user', JSON.stringify(user));
 }
 
+function resolveRole(payload = {}) {
+  return payload.role || payload.user?.role || 'user';
+}
+
+function redirectAfterAuth(payload = {}) {
+  const role = resolveRole(payload);
+  window.location.href = role === 'admin' ? '/admin.html' : '/dashboard.html';
+}
+
 function logout() {
   localStorage.removeItem('token');
   localStorage.removeItem('user');

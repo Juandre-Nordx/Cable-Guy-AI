@@ -1,4 +1,5 @@
 const kitGrid = document.getElementById('kit-grid');
+const productGrid = document.getElementById('product-grid');
 const query = new URLSearchParams(window.location.search);
 const highlightedType = query.get('kit');
 
@@ -17,6 +18,21 @@ function renderKit(kit) {
 
   const buyButton = card.querySelector('button');
   buyButton?.addEventListener('click', () => placeOrder(kit.id, kit.name));
+
+  return card;
+}
+
+function renderProduct(product) {
+  const card = document.createElement('article');
+  card.className = 'card product-card';
+
+  card.innerHTML = `
+    ${product.image_url ? `<img src="${product.image_url}" alt="${product.name}" loading="lazy" />` : ''}
+    <h3>${product.name}</h3>
+    <p class="subtext">${product.description || ''}</p>
+    <p><strong>Category:</strong> ${product.category}</p>
+    <p><strong>Price:</strong> $${Number(product.price).toFixed(2)}</p>
+  `;
 
   return card;
 }
@@ -70,9 +86,34 @@ async function loadKits() {
       kitGrid.appendChild(renderKit(kit));
     });
   } catch (error) {
-    console.error('[Store] Load failed:', error.message);
+    console.error('[Store] Kits load failed:', error.message);
     kitGrid.innerHTML = `<p class="warning">Error: ${error.message}</p>`;
   }
 }
 
+async function loadProducts() {
+  try {
+    console.log('[Store] Fetching products from /products');
+    const response = await fetch('/products');
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Unable to load products.');
+    }
+
+    if (!payload.products.length) {
+      productGrid.innerHTML = '<p class="subtext">No products available right now.</p>';
+      return;
+    }
+
+    payload.products.forEach((product) => {
+      productGrid.appendChild(renderProduct(product));
+    });
+  } catch (error) {
+    console.error('[Store] Products load failed:', error.message);
+    productGrid.innerHTML = `<p class="warning">Error: ${error.message}</p>`;
+  }
+}
+
 loadKits();
+loadProducts();

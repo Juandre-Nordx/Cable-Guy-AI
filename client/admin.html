@@ -7,30 +7,152 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="top-nav">
-      <a class="brand" href="/index.html">Cable Guy AI</a>
-      <nav>
-        <a href="/admin.html" class="active">Admin</a>
-        <a href="#" id="logout-link">Logout</a>
-      </nav>
-    </header>
+    <div class="admin-layout">
+      <aside class="admin-sidebar card">
+        <div>
+          <h1>Cable Guy AI</h1>
+          <p class="subtext">Super Admin Panel</p>
+        </div>
 
-    <main>
-      <section class="feature-grid">
-        <article class="card"><h3>Total Users</h3><p id="total-users">0</p></article>
-        <article class="card"><h3>Total Orders</h3><p id="total-orders">0</p></article>
-      </section>
+        <nav class="admin-nav" id="admin-nav">
+          <button class="admin-nav-link active" data-target="dashboard-section">Dashboard</button>
+          <button class="admin-nav-link" data-target="users-section">Users</button>
+          <button class="admin-nav-link" data-target="orders-section">Orders</button>
+          <button class="admin-nav-link" data-target="products-section">Products</button>
+          <button class="admin-nav-link" data-target="kits-section">Kits</button>
+          <button class="admin-nav-link" data-target="services-section">Services</button>
+        </nav>
 
-      <section class="card">
-        <h2>Orders by Status</h2>
-        <pre id="orders-by-status"></pre>
-      </section>
+        <button id="logout-button" class="button secondary">Logout</button>
+      </aside>
 
-      <section class="card">
-        <h2>All Orders</h2>
-        <div id="orders-table"></div>
-      </section>
-    </main>
+      <main class="admin-main">
+        <header class="card admin-header">
+          <h2 id="section-title">Dashboard</h2>
+          <p id="global-message" class="subtext"></p>
+        </header>
+
+        <section id="dashboard-section" class="admin-section">
+          <div class="feature-grid">
+            <article class="card"><h3>Total Users</h3><p id="total-users">0</p></article>
+            <article class="card"><h3>Total Orders</h3><p id="total-orders">0</p></article>
+            <article class="card"><h3>Total Products</h3><p id="total-products">0</p></article>
+            <article class="card"><h3>Total Kits</h3><p id="total-kits">0</p></article>
+          </div>
+          <article class="card mt-16">
+            <h3>Orders by Status</h3>
+            <pre id="orders-by-status"></pre>
+          </article>
+        </section>
+
+        <section id="users-section" class="admin-section hidden">
+          <article class="card">
+            <div class="section-header-row">
+              <h3>Users</h3>
+              <button class="button secondary" id="refresh-users">Refresh</button>
+            </div>
+            <div id="users-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="orders-section" class="admin-section hidden">
+          <article class="card">
+            <div class="section-header-row">
+              <h3>Orders</h3>
+              <button class="button secondary" id="refresh-orders">Refresh</button>
+            </div>
+            <div id="orders-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="products-section" class="admin-section hidden">
+          <article class="card">
+            <h3>Add Product</h3>
+            <form id="product-form" class="stack-form" enctype="multipart/form-data">
+              <label>Name<input type="text" name="name" required /></label>
+              <label>Category<input type="text" name="category" required /></label>
+              <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
+              <label>Cost<input type="number" name="cost" min="0" step="0.01" required /></label>
+              <label>Description<textarea name="description" rows="3"></textarea></label>
+              <label>Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
+              <button class="button primary" type="submit">Save Product</button>
+              <p id="product-message" class="subtext"></p>
+            </form>
+          </article>
+
+          <article class="card mt-16">
+            <div class="section-header-row">
+              <h3>Existing Products</h3>
+              <button class="button secondary" id="refresh-products">Refresh</button>
+            </div>
+            <div id="products-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="kits-section" class="admin-section hidden">
+          <article class="card">
+            <h3>Add Kit</h3>
+            <form id="kit-form" class="stack-form">
+              <label>Name<input type="text" name="name" required /></label>
+              <label>
+                Type
+                <select name="type" required>
+                  <option value="home">home</option>
+                  <option value="bridge">bridge</option>
+                  <option value="cctv">cctv</option>
+                  <option value="business">business</option>
+                </select>
+              </label>
+              <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
+              <label>
+                Difficulty
+                <select name="difficulty" required>
+                  <option value="easy">easy</option>
+                  <option value="medium">medium</option>
+                  <option value="hard">hard</option>
+                </select>
+              </label>
+              <label class="checkbox-row">
+                <input type="checkbox" name="requires_technician" />
+                Requires technician
+              </label>
+              <label>Description<textarea name="description" rows="3"></textarea></label>
+              <button class="button primary" type="submit">Save Kit</button>
+              <p id="kit-message" class="subtext"></p>
+            </form>
+          </article>
+
+          <article class="card mt-16">
+            <div class="section-header-row">
+              <h3>Existing Kits</h3>
+              <button class="button secondary" id="refresh-kits">Refresh</button>
+            </div>
+            <div id="kits-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="services-section" class="admin-section hidden">
+          <article class="card">
+            <h3>Add Service</h3>
+            <form id="service-form" class="stack-form">
+              <label>Name<input type="text" name="name" required /></label>
+              <label>Description<textarea name="description" rows="3"></textarea></label>
+              <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
+              <button class="button primary" type="submit">Save Service</button>
+              <p id="service-message" class="subtext"></p>
+            </form>
+          </article>
+
+          <article class="card mt-16">
+            <div class="section-header-row">
+              <h3>Existing Services</h3>
+              <button class="button secondary" id="refresh-services">Refresh</button>
+            </div>
+            <div id="services-table-wrap"></div>
+          </article>
+        </section>
+      </main>
+    </div>
 
     <script src="/auth.js"></script>
     <script src="/admin.js"></script>

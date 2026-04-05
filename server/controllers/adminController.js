@@ -121,6 +121,31 @@ async function createKit(req, res) {
   }
 }
 
+
+async function createService(req, res) {
+  try {
+    const { name, description, price } = req.body || {};
+
+    if (!requiredString(name) || !validateNumber(price)) {
+      return res.status(400).json({ success: false, error: 'name and price are required.' });
+    }
+
+    const result = await query(
+      `
+      INSERT INTO services (name, description, price)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+      `,
+      [name.trim(), description?.trim() || '', price]
+    );
+
+    return res.status(201).json({ success: true, service: result.rows[0] });
+  } catch (error) {
+    console.error('[POST /admin/service] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to create service.' });
+  }
+}
+
 async function listUsers(req, res) {
   try {
     const result = await query(
@@ -182,6 +207,7 @@ module.exports = {
   updateProduct,
   deleteProduct,
   createKit,
+  createService,
   listUsers,
   dashboard,
   uploadImage

@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 const OLLAMA_API_URL = 'https://ollama-production-bc2b.up.railway.app/api/chat';
 const OLLAMA_MODEL = 'phi3.5:latest';
-const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 12000);
+const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 45000);
 const MAX_USER_MESSAGE_LENGTH = Number(process.env.MAX_USER_MESSAGE_LENGTH || 2000);
 const MAX_AI_REPLY_LENGTH = Number(process.env.MAX_AI_REPLY_LENGTH || 2500);
 

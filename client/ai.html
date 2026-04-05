@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cable Guy AI | Assistant</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top-nav">
+      <a class="brand" href="/index.html">Cable Guy AI</a>
+      <nav>
+        <a href="/index.html">Home</a>
+        <a href="/ai.html" class="active">AI Assistant</a>
+        <a href="/store.html">Store</a>
+      </nav>
+    </header>
+
+    <main class="narrow">
+      <section class="chat-shell card">
+        <h1>AI WiFi Diagnosis</h1>
+        <p class="subtext">Describe your issue. The assistant will ask follow-up questions and recommend a next step.</p>
+
+        <div id="chat" class="chat-log"></div>
+
+        <form id="chat-form" class="chat-form">
+          <input id="message-input" type="text" placeholder="My WiFi drops in the bedroom..." required />
+          <button id="send-button" type="submit" class="button primary">Send</button>
+        </form>
+      </section>
+
+      <section id="booking-section" class="card hidden">
+        <h2>Book Installation</h2>
+        <p class="subtext">Use this when the AI indicates professional onsite support is required.</p>
+        <form id="booking-form" class="stack-form">
+          <input id="booking-name" type="text" placeholder="Full name" required />
+          <input id="booking-phone" type="tel" placeholder="Phone number" required />
+          <input id="booking-address" type="text" placeholder="Service address" required />
+          <input id="booking-kit-id" type="number" placeholder="Kit ID (optional from recommendation)" />
+          <button type="submit" class="button secondary">Book Installation</button>
+        </form>
+        <p id="booking-result" class="subtext"></p>
+      </section>
+    </main>
+
+    <script src="/ai.js"></script>
+  </body>
+</html>

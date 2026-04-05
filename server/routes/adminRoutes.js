@@ -14,7 +14,7 @@ const {
   dashboard,
   uploadImage
 } = require('../controllers/adminController');
-const { listAllOrders, updateOrderStatus } = require('../controllers/orderController');
+const { listAllOrders, updateOrderStatus, createAdminOrderNote } = require('../controllers/orderController');
 
 if (!fs.existsSync(config.uploadDir)) {
   fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -47,6 +47,7 @@ router.use(authenticate, requireAdmin);
 router.get('/users', listUsers);
 router.get('/orders', listAllOrders);
 router.put('/orders/:id', updateOrderStatus);
+router.post('/orders/:id/note', createAdminOrderNote);
 router.get('/dashboard', dashboard);
 
 router.post('/product', createProduct);

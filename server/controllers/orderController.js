@@ -1,5 +1,5 @@
 const { query } = require('../models/db');
-const { validateEnum } = require('../middleware/validate');
+const { validateEnum, requiredString } = require('../middleware/validate');
 
 const ORDER_STATUSES = ['placed', 'processing', 'out_for_delivery', 'delivered', 'done'];
 
@@ -107,10 +107,107 @@ async function updateOrderStatus(req, res) {
   }
 }
 
+async function getAccessibleOrder(orderId, user) {
+  const result = await query(
+    `
+    SELECT id, user_id
+    FROM orders
+    WHERE id = $1;
+    `,
+    [orderId]
+  );
+
+  const order = result.rows[0];
+  if (!order) {
+    return { error: { status: 404, message: 'Order not found.' } };
+  }
+
+  const isOwner = Number(order.user_id) === Number(user.id);
+  const isAdmin = user.role === 'admin';
+
+  if (!isOwner && !isAdmin) {
+    return { error: { status: 403, message: 'You do not have access to this order.' } };
+  }
+
+  return { order };
+}
+
+async function listOrderNotes(req, res) {
+  try {
+    const orderId = Number(req.params.id);
+
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid order id is required.' });
+    }
+
+    const access = await getAccessibleOrder(orderId, req.user);
+    if (access.error) {
+      return res.status(access.error.status).json({ success: false, error: access.error.message });
+    }
+
+    const result = await query(
+      `
+      SELECT id, order_id, message, created_by, created_at
+      FROM order_notes
+      WHERE order_id = $1
+      ORDER BY created_at ASC;
+      `,
+      [orderId]
+    );
+
+    return res.json({ success: true, notes: result.rows });
+  } catch (error) {
+    console.error('[GET /orders/:id/notes] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load order notes.' });
+  }
+}
+
+async function createOrderNote(req, res) {
+  try {
+    const orderId = Number(req.params.id);
+    const message = req.body?.message;
+
+    if (!Number.isInteger(orderId) || orderId <= 0 || !requiredString(message)) {
+      return res.status(400).json({ success: false, error: 'Valid order id and note message are required.' });
+    }
+
+    const access = await getAccessibleOrder(orderId, req.user);
+    if (access.error) {
+      return res.status(access.error.status).json({ success: false, error: access.error.message });
+    }
+
+    const createdBy = req.user.role === 'admin' ? 'admin' : 'user';
+    const result = await query(
+      `
+      INSERT INTO order_notes (order_id, message, created_by)
+      VALUES ($1, $2, $3)
+      RETURNING id, order_id, message, created_by, created_at;
+      `,
+      [orderId, message.trim(), createdBy]
+    );
+
+    return res.status(201).json({ success: true, note: result.rows[0] });
+  } catch (error) {
+    console.error('[POST /orders/:id/note] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to save order note.' });
+  }
+}
+
+async function createAdminOrderNote(req, res) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Admin access required.' });
+  }
+
+  return createOrderNote(req, res);
+}
+
 module.exports = {
   ORDER_STATUSES,
   createOrder,
   listMyOrders,
   listAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  listOrderNotes,
+  createOrderNote,
+  createAdminOrderNote
 };

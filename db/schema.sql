@@ -1,11 +1,16 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
+  contact_number TEXT NOT NULL DEFAULT '',
   email TEXT NOT NULL UNIQUE,
+  address TEXT NOT NULL DEFAULT '',
   password TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_number TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS products (
   id SERIAL PRIMARY KEY,
@@ -35,6 +40,14 @@ CREATE TABLE IF NOT EXISTS kit_items (
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   UNIQUE (kit_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kit_id INTEGER REFERENCES kits(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'placed' CHECK (status IN ('placed', 'processing', 'out_for_delivery', 'delivered', 'done')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS bookings (

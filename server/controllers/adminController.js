@@ -1,5 +1,6 @@
 const { query } = require('../models/db');
 const { requiredString, validateEnum, validateNumber } = require('../middleware/validate');
+const { ORDER_STATUSES } = require('./orderController');
 
 const KIT_TYPES = ['home', 'bridge', 'cctv', 'business'];
 
@@ -120,20 +121,45 @@ async function createKit(req, res) {
   }
 }
 
+async function listUsers(req, res) {
+  try {
+    const result = await query(
+      `
+      SELECT id, name, contact_number, email, address, role, created_at
+      FROM users
+      ORDER BY created_at DESC;
+      `
+    );
+    return res.json({ success: true, users: result.rows });
+  } catch (error) {
+    console.error('[GET /admin/users] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load users.' });
+  }
+}
+
 async function dashboard(req, res) {
   try {
-    const [users, bookings, products] = await Promise.all([
+    const [usersResult, ordersResult, ordersByStatusResult] = await Promise.all([
       query('SELECT COUNT(*)::int AS count FROM users;'),
-      query('SELECT COUNT(*)::int AS count FROM bookings;'),
-      query('SELECT COUNT(*)::int AS count FROM products;')
+      query('SELECT COUNT(*)::int AS count FROM orders;'),
+      query('SELECT status, COUNT(*)::int AS count FROM orders GROUP BY status;')
     ]);
+
+    const ordersByStatus = ORDER_STATUSES.reduce((acc, status) => {
+      acc[status] = 0;
+      return acc;
+    }, {});
+
+    for (const row of ordersByStatusResult.rows) {
+      ordersByStatus[row.status] = row.count;
+    }
 
     return res.json({
       success: true,
       stats: {
-        users: users.rows[0].count,
-        bookings: bookings.rows[0].count,
-        products: products.rows[0].count
+        total_users: usersResult.rows[0].count,
+        total_orders: ordersResult.rows[0].count,
+        orders_by_status: ordersByStatus
       }
     });
   } catch (error) {
@@ -156,6 +182,7 @@ module.exports = {
   updateProduct,
   deleteProduct,
   createKit,
+  listUsers,
   dashboard,
   uploadImage
 };

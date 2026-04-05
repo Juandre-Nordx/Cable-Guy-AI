@@ -9,10 +9,11 @@ const {
   updateProduct,
   deleteProduct,
   createKit,
+  listUsers,
   dashboard,
   uploadImage
 } = require('../controllers/adminController');
-const { updateBookingStatus } = require('../controllers/bookingController');
+const { listAllOrders, updateOrderStatus } = require('../controllers/orderController');
 
 if (!fs.existsSync(config.uploadDir)) {
   fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -42,12 +43,15 @@ const upload = multer({
 
 router.use(authenticate, requireAdmin);
 
+router.get('/users', listUsers);
+router.get('/orders', listAllOrders);
+router.put('/orders/:id', updateOrderStatus);
+router.get('/dashboard', dashboard);
+
 router.post('/product', createProduct);
 router.put('/product/:id', updateProduct);
 router.delete('/product/:id', deleteProduct);
 router.post('/kit', createKit);
-router.get('/dashboard', dashboard);
-router.put('/booking/:id/status', updateBookingStatus);
 router.post('/upload', upload.single('image'), uploadImage);
 
 module.exports = router;

@@ -217,3 +217,34 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--border);
+  padding: 0.55rem;
+  text-align: left;
+}
+
+th {
+  background: #f8fafc;
+}
+
+select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem;
+}
+
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.8rem;
+  border-radius: 10px;
+  overflow-x: auto;
+}

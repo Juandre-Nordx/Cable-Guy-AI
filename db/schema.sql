@@ -95,16 +95,30 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+WITH seed_kits (name, type, price, difficulty, requires_technician, description) AS (
+  VALUES
+    ('Home WiFi Kit', 'home', 199.99::numeric, 'easy', false, 'Dual-node mesh kit for apartments and homes with dead zones.'),
+    ('Bridge Kit', 'bridge', 299.00::numeric, 'medium', true, 'Point-to-point bridge kit to connect detached buildings or garages.'),
+    ('CCTV Kit', 'cctv', 399.00::numeric, 'medium', true, 'CCTV package with NVR and PoE cameras for secure monitoring.'),
+    ('Business Network Kit', 'business', 549.00::numeric, 'medium', true, 'Router + managed switch + APs for multi-user environments.')
+),
+updated AS (
+  UPDATE kits k
+  SET
+    name = sk.name,
+    price = sk.price,
+    difficulty = sk.difficulty,
+    requires_technician = sk.requires_technician,
+    description = sk.description
+  FROM seed_kits sk
+  WHERE k.type = sk.type
+  RETURNING k.type
+)
 INSERT INTO kits (name, type, price, difficulty, requires_technician, description)
-VALUES
-  ('Home WiFi Kit', 'home', 199.99, 'easy', false, 'Dual-node mesh kit for apartments and homes with dead zones.'),
-  ('Bridge Kit', 'bridge', 299.00, 'medium', true, 'Point-to-point bridge kit to connect detached buildings or garages.'),
-  ('CCTV Kit', 'cctv', 399.00, 'medium', true, 'CCTV package with NVR and PoE cameras for secure monitoring.'),
-  ('Business Network Kit', 'business', 549.00, 'medium', true, 'Router + managed switch + APs for multi-user environments.')
-ON CONFLICT (type) DO UPDATE
-SET
-  name = EXCLUDED.name,
-  price = EXCLUDED.price,
-  difficulty = EXCLUDED.difficulty,
-  requires_technician = EXCLUDED.requires_technician,
-  description = EXCLUDED.description;
+SELECT sk.name, sk.type, sk.price, sk.difficulty, sk.requires_technician, sk.description
+FROM seed_kits sk
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM kits k
+  WHERE k.type = sk.type
+);

@@ -747,6 +747,13 @@ function handleWizardNodeClick(nodeId, jumpToEditor = false) {
   renderWizardBuilder();
 }
 
+function toggleWizardResultFields() {
+  const form = document.getElementById('wizard-node-form');
+  if (!form) return;
+  const isResult = form.elements.type.value === 'result';
+  form.querySelector('[data-role="wizard-message-field"]')?.classList.toggle('hidden', !isResult);
+}
+
 function createWizardNodeDraft() {
   const form = document.getElementById('wizard-node-form');
   form.reset();

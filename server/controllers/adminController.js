@@ -3,6 +3,7 @@ const { requiredString, validateEnum, validateNumber } = require('../middleware/
 const { ORDER_STATUSES } = require('./orderController');
 
 const KIT_CATEGORIES = ['home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart'];
+const WIZARD_NODE_TYPES = ['question', 'result'];
 
 async function createProduct(req, res) {
   try {
@@ -212,6 +213,244 @@ async function uploadImage(req, res) {
   return res.status(201).json({ success: true, imageUrl });
 }
 
+async function listWizardNodes(_req, res) {
+  try {
+    const result = await query(
+      `
+      SELECT id, title, type, message, category, needs_technician, created_at
+      FROM wizard_nodes
+      ORDER BY id ASC;
+      `
+    );
+
+    return res.json({ success: true, nodes: result.rows });
+  } catch (error) {
+    console.error('[GET /admin/wizard/nodes] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load wizard nodes.' });
+  }
+}
+
+async function listWizardEdges(_req, res) {
+  try {
+    const result = await query(
+      `
+      SELECT id, from_node_id, to_node_id, label, created_at
+      FROM wizard_edges
+      ORDER BY from_node_id ASC, id ASC;
+      `
+    );
+
+    return res.json({ success: true, edges: result.rows });
+  } catch (error) {
+    console.error('[GET /admin/wizard/edges] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load wizard edges.' });
+  }
+}
+
+function sanitizeWizardNodeInput(payload = {}) {
+  const title = requiredString(payload.title) ? payload.title.trim() : '';
+  const type = payload.type;
+  const message = requiredString(payload.message) ? payload.message.trim() : '';
+  const category = requiredString(payload.category) ? payload.category.trim() : null;
+  const needsTechnician = Boolean(payload.needs_technician);
+  return { title, type, message, category, needsTechnician };
+}
+
+async function countRootNodes() {
+  const result = await query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM wizard_nodes wn
+    LEFT JOIN wizard_edges we ON we.to_node_id = wn.id
+    WHERE we.id IS NULL;
+    `
+  );
+
+  return result.rows[0]?.count || 0;
+}
+
+async function createWizardNode(req, res) {
+  try {
+    const { title, type, message, category, needsTechnician } = sanitizeWizardNodeInput(req.body);
+
+    if (!requiredString(title) || !validateEnum(type, WIZARD_NODE_TYPES)) {
+      return res.status(400).json({ success: false, error: 'title and valid type are required.' });
+    }
+
+    if (type === 'result' && !requiredString(message)) {
+      return res.status(400).json({ success: false, error: 'message is required for result nodes.' });
+    }
+
+    const result = await query(
+      `
+      INSERT INTO wizard_nodes (title, type, message, category, needs_technician)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, title, type, message, category, needs_technician, created_at;
+      `,
+      [title, type, type === 'result' ? message : '', category, needsTechnician]
+    );
+
+    return res.status(201).json({ success: true, node: result.rows[0] });
+  } catch (error) {
+    console.error('[POST /admin/wizard/node] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to create wizard node.' });
+  }
+}
+
+async function updateWizardNode(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const { title, type, message, category, needsTechnician } = sanitizeWizardNodeInput(req.body);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid node id.' });
+    }
+
+    if (!requiredString(title) || !validateEnum(type, WIZARD_NODE_TYPES)) {
+      return res.status(400).json({ success: false, error: 'title and valid type are required.' });
+    }
+
+    if (type === 'result' && !requiredString(message)) {
+      return res.status(400).json({ success: false, error: 'message is required for result nodes.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE wizard_nodes
+      SET title = $2,
+          type = $3,
+          message = $4,
+          category = $5,
+          needs_technician = $6
+      WHERE id = $1
+      RETURNING id, title, type, message, category, needs_technician, created_at;
+      `,
+      [id, title, type, type === 'result' ? message : '', category, needsTechnician]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Wizard node not found.' });
+    }
+
+    return res.json({ success: true, node: result.rows[0] });
+  } catch (error) {
+    console.error('[PUT /admin/wizard/node/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update wizard node.' });
+  }
+}
+
+async function deleteWizardNode(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid node id.' });
+    }
+
+    const totalNodesResult = await query('SELECT COUNT(*)::int AS count FROM wizard_nodes;');
+    if ((totalNodesResult.rows[0]?.count || 0) <= 1) {
+      return res.status(400).json({ success: false, error: 'Wizard must contain at least one root node.' });
+    }
+
+    const result = await query('DELETE FROM wizard_nodes WHERE id = $1 RETURNING id;', [id]);
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Wizard node not found.' });
+    }
+
+    return res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('[DELETE /admin/wizard/node/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete wizard node.' });
+  }
+}
+
+async function hasPathBetweenNodes(fromNodeId, toNodeId) {
+  const result = await query(
+    `
+    WITH RECURSIVE walk AS (
+      SELECT $1::int AS node_id
+      UNION
+      SELECT we.to_node_id
+      FROM wizard_edges we
+      JOIN walk w ON we.from_node_id = w.node_id
+    )
+    SELECT EXISTS (
+      SELECT 1 FROM walk WHERE node_id = $2
+    ) AS has_path;
+    `,
+    [fromNodeId, toNodeId]
+  );
+
+  return result.rows[0]?.has_path === true;
+}
+
+async function createWizardEdge(req, res) {
+  try {
+    const fromNodeId = Number(req.body?.from_node_id);
+    const toNodeId = Number(req.body?.to_node_id);
+    const label = req.body?.label?.toString().trim();
+
+    if (!Number.isInteger(fromNodeId) || !Number.isInteger(toNodeId) || !requiredString(label)) {
+      return res.status(400).json({ success: false, error: 'from_node_id, to_node_id, and label are required.' });
+    }
+
+    if (fromNodeId === toNodeId) {
+      return res.status(400).json({ success: false, error: 'A node cannot connect to itself.' });
+    }
+
+    const nodeCheck = await query('SELECT id FROM wizard_nodes WHERE id = ANY($1::int[]);', [[fromNodeId, toNodeId]]);
+    if (nodeCheck.rowCount !== 2) {
+      return res.status(400).json({ success: false, error: 'Both source and target nodes must exist.' });
+    }
+
+    const hasCycle = await hasPathBetweenNodes(toNodeId, fromNodeId);
+    if (hasCycle) {
+      return res.status(400).json({ success: false, error: 'Connection creates a loop. Please choose another target.' });
+    }
+
+    const result = await query(
+      `
+      INSERT INTO wizard_edges (from_node_id, to_node_id, label)
+      VALUES ($1, $2, $3)
+      RETURNING id, from_node_id, to_node_id, label, created_at;
+      `,
+      [fromNodeId, toNodeId, label]
+    );
+
+    const rootCount = await countRootNodes();
+    if (rootCount === 0) {
+      await query('DELETE FROM wizard_edges WHERE id = $1;', [result.rows[0].id]);
+      return res.status(409).json({ success: false, error: 'Wizard must always have at least one root node.' });
+    }
+
+    return res.status(201).json({ success: true, edge: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ success: false, error: 'This choice label already exists for the selected source node.' });
+    }
+    console.error('[POST /admin/wizard/edge] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to create wizard edge.' });
+  }
+}
+
+async function deleteWizardEdge(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid edge id.' });
+    }
+
+    const result = await query('DELETE FROM wizard_edges WHERE id = $1 RETURNING id;', [id]);
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Wizard edge not found.' });
+    }
+
+    return res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('[DELETE /admin/wizard/edge/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete wizard edge.' });
+  }
+}
+
 module.exports = {
   createProduct,
   updateProduct,
@@ -220,5 +459,12 @@ module.exports = {
   createService,
   listUsers,
   dashboard,
-  uploadImage
+  uploadImage,
+  listWizardNodes,
+  createWizardNode,
+  updateWizardNode,
+  deleteWizardNode,
+  listWizardEdges,
+  createWizardEdge,
+  deleteWizardEdge
 };

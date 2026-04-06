@@ -1,6 +1,8 @@
 const wizardForm = document.getElementById('wizard-form');
-const wizardSubmitButton = document.getElementById('wizard-submit');
 const wizardResult = document.getElementById('wizard-result');
+const wizardQuestion = document.getElementById('wizard-question');
+const wizardOptions = document.getElementById('wizard-options');
+const wizardResetButton = document.getElementById('wizard-reset');
 const chatShell = document.getElementById('chat-shell');
 
 const chatContainer = document.getElementById('chat');
@@ -12,6 +14,12 @@ const bookingSection = document.getElementById('booking-section');
 const bookingForm = document.getElementById('booking-form');
 const bookingResult = document.getElementById('booking-result');
 const bookingKitId = document.getElementById('booking-kit-id');
+const wizardState = {
+  rootNodeId: null,
+  currentNodeId: null,
+  nodesById: new Map(),
+  outgoingByNodeId: new Map()
+};
 
 function scrollToBottom() {
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -68,13 +76,13 @@ function renderTechnicianPrompt(message = 'This issue may require onsite setup o
 }
 
 function renderWizardResult(payload) {
-  const viewKitLink = `/store.html?category=${encodeURIComponent(payload.recommendedCategory)}`;
+  const viewKitLink = payload.category ? `/store.html?category=${encodeURIComponent(payload.category)}` : '/store.html';
 
   wizardResult.classList.remove('hidden');
   wizardResult.innerHTML = `
-    <h3>Recommended Category: ${payload.recommendedCategory}</h3>
+    <h3>Recommended Category: ${payload.category || 'General'}</h3>
     <p class="subtext">${payload.message}</p>
-    ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : ''}
+    ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : '<p class="success">✅ No onsite technician required.</p>'}
     <div class="kit-card-actions">
       <a class="button secondary" href="${viewKitLink}">View Kit</a>
       <button id="continue-chat" class="button primary" type="button">Continue with AI Assistant</button>
@@ -83,7 +91,7 @@ function renderWizardResult(payload) {
 
   document.getElementById('continue-chat')?.addEventListener('click', () => {
     chatShell.classList.remove('hidden');
-    const starter = `Wizard context: problem=${payload.problem}, property=${payload.property_type}, distance=${payload.distance}, self_install=${payload.self_install}. Please provide deeper setup guidance for a ${payload.recommendedCategory} kit.`;
+    const starter = `Wizard context: ${payload.message}. Category=${payload.category || 'general'}, needs_technician=${payload.needsTechnician}. Please provide deeper setup guidance.`;
     if (!chatContainer.childElementCount) {
       renderMessage('Hi, I am Cable Guy AI. Tell me what is happening with your WiFi and I will guide your diagnosis.', 'ai');
     }
@@ -93,38 +101,72 @@ function renderWizardResult(payload) {
   });
 }
 
-async function runWizard(event) {
-  event.preventDefault();
-  const data = new FormData(wizardForm);
+function setWizardTree(payload) {
+  wizardState.rootNodeId = payload.rootNodeId;
+  wizardState.currentNodeId = payload.rootNodeId;
+  wizardState.nodesById = new Map((payload.nodes || []).map((node) => [node.id, node]));
+  wizardState.outgoingByNodeId = new Map();
 
-  const payload = {
-    problem: data.get('problem')?.toString(),
-    property_type: data.get('property_type')?.toString(),
-    distance: data.get('distance')?.toString(),
-    self_install: data.get('self_install') === 'yes'
-  };
-
-  wizardSubmitButton.disabled = true;
-  wizardResult.classList.add('hidden');
-
-  try {
-    const response = await fetch('/ai/wizard', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const body = await response.json();
-    if (!response.ok) {
-      throw new Error(body.error || 'Wizard failed to evaluate answers.');
+  for (const edge of payload.edges || []) {
+    if (!wizardState.outgoingByNodeId.has(edge.from_node_id)) {
+      wizardState.outgoingByNodeId.set(edge.from_node_id, []);
     }
+    wizardState.outgoingByNodeId.get(edge.from_node_id).push(edge);
+  }
+}
 
-    renderWizardResult({ ...body, ...payload });
+function renderCurrentWizardNode() {
+  const node = wizardState.nodesById.get(wizardState.currentNodeId);
+  if (!node) {
+    wizardQuestion.textContent = 'Wizard configuration is incomplete.';
+    wizardOptions.innerHTML = '';
+    return;
+  }
+
+  if (node.type === 'result') {
+    wizardQuestion.textContent = 'Diagnosis complete.';
+    wizardOptions.innerHTML = '';
+    renderWizardResult({
+      message: node.message || 'No recommendation message configured.',
+      category: node.category || null,
+      needsTechnician: Boolean(node.needs_technician)
+    });
+    return;
+  }
+
+  wizardResult.classList.add('hidden');
+  wizardQuestion.textContent = node.title;
+  const edges = wizardState.outgoingByNodeId.get(node.id) || [];
+  if (!edges.length) {
+    wizardOptions.innerHTML = '<p class="subtext">No options configured for this question yet.</p>';
+    return;
+  }
+
+  wizardOptions.innerHTML = edges
+    .map(
+      (edge) =>
+        `<button class="button secondary" type="button" data-wizard-next="${edge.to_node_id}">${edge.label}</button>`
+    )
+    .join('');
+
+  document.querySelectorAll('[data-wizard-next]').forEach((button) => {
+    button.addEventListener('click', () => {
+      wizardState.currentNodeId = Number(button.dataset.wizardNext);
+      renderCurrentWizardNode();
+    });
+  });
+}
+
+async function loadWizardTree() {
+  try {
+    const response = await fetch('/ai/wizard/tree');
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Failed to load wizard tree.');
+    setWizardTree(payload);
+    renderCurrentWizardNode();
   } catch (error) {
     wizardResult.classList.remove('hidden');
     wizardResult.innerHTML = `<p class="warning">Error: ${error.message}</p>`;
-  } finally {
-    wizardSubmitButton.disabled = false;
   }
 }
 
@@ -208,4 +250,11 @@ bookingForm.addEventListener('submit', async (event) => {
   }
 });
 
-wizardForm.addEventListener('submit', runWizard);
+wizardForm.addEventListener('submit', (event) => event.preventDefault());
+wizardResetButton?.addEventListener('click', () => {
+  wizardState.currentNodeId = wizardState.rootNodeId;
+  wizardResult.classList.add('hidden');
+  renderCurrentWizardNode();
+});
+
+loadWizardTree();

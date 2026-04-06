@@ -1,5 +1,6 @@
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
+const serviceGrid = document.getElementById('service-grid');
 const orderFlowModal = document.getElementById('order-flow-modal');
 const query = new URLSearchParams(window.location.search);
 const highlightedCategory = query.get('category');
@@ -8,6 +9,7 @@ const highlightedKitId = Number(query.get('kit_id') || 0);
 const highlightedServiceId = Number(query.get('service_id') || 0);
 let showOrderPopup = false;
 let popupResolve = null;
+let isPlacingOrder = false;
 
 function escapeHtml(text = '') {
   return text
@@ -74,8 +76,8 @@ function renderKit(kit) {
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
     <p><strong>Price:</strong> ${formatCurrency(kit.price, kit.currency)}</p>
     <div class="kit-card-actions">
-      <button class="button secondary" data-toggle-details="${detailsId}">View Details</button>
-      <button class="button primary" data-kit-id="${kit.id}">Place Order</button>
+      <button class="button secondary" type="button" data-toggle-details="${detailsId}">View Details</button>
+      <button class="button primary" type="button" data-kit-id="${kit.id}">Place Order</button>
     </div>
     <section id="${detailsId}" class="kit-details hidden">
       ${kit.image_url ? `<img src="${kit.image_url}" alt="${kit.name}" class="kit-main-image" loading="lazy" />` : ''}
@@ -87,10 +89,16 @@ function renderKit(kit) {
   `;
 
   const buyButton = card.querySelector('[data-kit-id]');
-  buyButton?.addEventListener('click', () => placeOrder(kit.id, kit.name));
+  buyButton?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    console.log('Button clicked');
+    await withButtonLoading(buyButton, 'Loading...', () => placeOrder(kit.id, kit.name));
+  });
 
   const detailsButton = card.querySelector('[data-toggle-details]');
-  detailsButton?.addEventListener('click', () => {
+  detailsButton?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    console.log('Button clicked');
     const details = card.querySelector(`#${detailsId}`);
     const isHidden = details?.classList.contains('hidden');
     details?.classList.toggle('hidden', !isHidden);
@@ -116,12 +124,45 @@ function renderProduct(product) {
   return card;
 }
 
+function renderService(service) {
+  const card = document.createElement('article');
+  card.className = `card product-card ${highlightedServiceId === service.id ? 'recommended' : ''}`;
+  card.id = `service-card-${service.id}`;
+
+  card.innerHTML = `
+    <h3>${service.name}</h3>
+    <p class="subtext">${service.description || ''}</p>
+    <p><strong>Price:</strong> ${formatCurrency(service.price, service.currency)}</p>
+  `;
+
+  return card;
+}
+
 function formatCurrency(price, currency = 'ZAR') {
   const numericPrice = Number(price);
   if (!Number.isFinite(numericPrice)) return '-';
   if (currency === 'ZAR') return `R ${numericPrice.toFixed(2)}`;
   if (currency === 'USD') return `$ ${numericPrice.toFixed(2)}`;
   return `${numericPrice.toFixed(2)}`;
+}
+
+async function withButtonLoading(button, loadingText, action) {
+  const originalLabel = button?.textContent || '';
+  if (button) {
+    button.disabled = true;
+    button.textContent = loadingText;
+  }
+
+  try {
+    await action();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
 }
 
 function lockBodyScroll(shouldLock) {
@@ -150,7 +191,8 @@ function highlightRequestedItems() {
   if (highlightedKitId > 0) targets.push(document.getElementById(`kit-card-${highlightedKitId}`));
 
   if (!targets.length && highlightedServiceId > 0) {
-    targets.push(productGrid);
+    targets.push(document.getElementById(`service-card-${highlightedServiceId}`));
+    targets.push(serviceGrid);
   }
 
   const first = targets.find(Boolean);
@@ -168,6 +210,7 @@ function showOrderFlowModalAfterClick() {
 }
 
 async function placeOrder(kitId, kitName) {
+  if (isPlacingOrder || showOrderPopup) return;
   const token = localStorage.getItem('token');
 
   if (!token) {
@@ -175,13 +218,14 @@ async function placeOrder(kitId, kitName) {
     return;
   }
 
-  console.log('Popup triggered');
-  const confirmed = await showOrderFlowModalAfterClick();
-  if (!confirmed) {
-    return;
-  }
-
   try {
+    isPlacingOrder = true;
+    console.log('Popup triggered');
+    const confirmed = await showOrderFlowModalAfterClick();
+    if (!confirmed) {
+      return;
+    }
+
     const response = await fetch('/orders', {
       method: 'POST',
       headers: {
@@ -199,7 +243,10 @@ async function placeOrder(kitId, kitName) {
     window.alert(`Order placed for ${kitName}. Tracking is available on your dashboard.`);
     window.location.href = '/dashboard.html';
   } catch (error) {
+    console.error('Order error:', error);
     window.alert(error.message);
+  } finally {
+    isPlacingOrder = false;
   }
 }
 
@@ -277,7 +324,35 @@ async function loadProducts() {
   }
 }
 
+async function loadServices() {
+  if (!serviceGrid) return;
+
+  try {
+    console.log('[Store] Fetching services from /services');
+    const response = await fetch('/services');
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Unable to load services.');
+    }
+
+    if (!payload.services.length) {
+      serviceGrid.innerHTML = '<p class="subtext">No services available right now.</p>';
+      return;
+    }
+
+    payload.services.forEach((service) => {
+      serviceGrid.appendChild(renderService(service));
+    });
+    highlightRequestedItems();
+  } catch (error) {
+    console.error('[Store] Services load failed:', error.message);
+    serviceGrid.innerHTML = `<p class="warning">Error: ${error.message}</p>`;
+  }
+}
+
 loadKits();
 loadProducts();
+loadServices();
 wirePopupControls();
 toggleOrderFlowModal();

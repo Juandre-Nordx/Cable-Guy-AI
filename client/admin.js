@@ -554,7 +554,7 @@ function renderServicesTable() {
         <td>${service.id}</td>
         <td>${service.name}</td>
         <td>${service.description}</td>
-        <td>$${Number(service.price).toFixed(2)}</td>
+        <td>${formatPrice(service.price, service.currency || state.settings.currency)}</td>
         <td>
           <div class="admin-order-actions">
             <button class="button secondary" type="button" data-edit-service="${service.id}">Edit</button>

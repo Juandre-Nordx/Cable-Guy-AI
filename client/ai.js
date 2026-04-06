@@ -22,6 +22,7 @@ const wizardState = {
   nodesById: new Map(),
   outgoingByNodeId: new Map()
 };
+const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
 
 function scrollToBottom() {
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -79,12 +80,39 @@ function renderTechnicianPrompt(message = 'This issue may require onsite setup o
 
 function renderWizardResult(payload) {
   const viewKitLink = payload.category ? `/store.html?category=${encodeURIComponent(payload.category)}` : '/store.html';
+  const recommendedItems = Array.isArray(payload.recommendedItems) ? payload.recommendedItems : [];
+  const recommendedSection = recommendedItems.length
+    ? `
+      <section class="recommended-section">
+        <h4>Recommended for You</h4>
+        <div class="recommended-scroll">
+          ${recommendedItems
+            .map(
+              (item) => `
+                <article class="card recommended-item-card">
+                  ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" loading="lazy" />` : '<div class="recommended-image-placeholder">No Image</div>'}
+                  <h5>${item.name || `${item.type} #${item.id}`}</h5>
+                  <p class="subtext">${item.type}</p>
+                  <p><strong>Price:</strong> ${formatPrice(item.price, item.currency)}</p>
+                  <div class="kit-card-actions">
+                    <a class="button secondary" href="${resolveItemLink(item, 'view')}">View</a>
+                    <a class="button primary" href="${resolveItemLink(item, 'buy')}">Buy</a>
+                  </div>
+                </article>
+              `
+            )
+            .join('')}
+        </div>
+      </section>
+    `
+    : '';
 
   wizardResult.classList.remove('hidden');
   wizardResult.innerHTML = `
     <h3>Recommended Category: ${payload.category || 'General'}</h3>
     <p class="subtext">${payload.message}</p>
     ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : '<p class="success">✅ No onsite technician required.</p>'}
+    ${recommendedSection}
     <div class="kit-card-actions">
       <a class="button secondary" href="${viewKitLink}">Visit Store</a>
       <button id="book-teck" class="button primary" type="button">Book a teck</button>
@@ -95,6 +123,23 @@ function renderWizardResult(payload) {
     bookingSection.classList.remove('hidden');
     bookingSection.scrollIntoView({ behavior: 'smooth' });
   });
+}
+
+function resolveItemLink(item, action = 'view') {
+  if (item.type === 'product') return `/store.html#product-grid`;
+  if (item.type === 'service') return '/store.html';
+  if (item.type === 'kit') {
+    const base = `/store.html?category=${encodeURIComponent(item.category || '')}`;
+    return action === 'buy' ? `${base}#kit-grid` : base;
+  }
+  return '/store.html';
+}
+
+function formatPrice(amount, currency = 'ZAR') {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return 'Contact us';
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  return `${symbol}${numericAmount.toFixed(2)}`;
 }
 
 function setWizardTree(payload) {
@@ -125,7 +170,8 @@ function renderCurrentWizardNode() {
     renderWizardResult({
       message: node.message || 'No recommendation message configured.',
       category: node.category || null,
-      needsTechnician: Boolean(node.needs_technician)
+      needsTechnician: Boolean(node.needs_technician),
+      recommendedItems: node.recommendedItems || node.recommended_items || []
     });
     return;
   }

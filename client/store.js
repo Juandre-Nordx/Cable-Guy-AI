@@ -6,7 +6,7 @@ const orderFlowModal = document.getElementById('order-flow-modal');
 const query = new URLSearchParams(window.location.search);
 const highlightedCategory = query.get('category');
 const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
-const ORDER_FLOW_SEEN_KEY = 'order-flow-popup-seen';
+let showOrderPopup = false;
 
 function escapeHtml(text = '') {
   return text
@@ -125,28 +125,28 @@ function formatPrice(amount, currency = 'ZAR') {
   return `${symbol} ${formatted}`;
 }
 
-function showOrderFlowModalOnce() {
-  if (!orderFlowModal) {
-    return Promise.resolve(true);
-  }
+function toggleOrderFlowModal() {
+  if (!orderFlowModal) return;
+  orderFlowModal.classList.toggle('hidden', !showOrderPopup);
+}
 
-  if (sessionStorage.getItem(ORDER_FLOW_SEEN_KEY) === 'true') {
-    return Promise.resolve(true);
-  }
+function showOrderFlowModalAfterClick() {
+  if (!orderFlowModal) return Promise.resolve(true);
 
-  orderFlowModal.classList.remove('hidden');
+  showOrderPopup = true;
+  toggleOrderFlowModal();
 
   return new Promise((resolve) => {
     const confirmButton = document.getElementById('confirm-order-flow');
     const cancelButton = document.getElementById('cancel-order-flow');
+    const closeButton = document.getElementById('close-order-flow');
 
     const cleanup = (confirmed) => {
-      orderFlowModal.classList.add('hidden');
+      showOrderPopup = false;
+      toggleOrderFlowModal();
       confirmButton?.removeEventListener('click', onConfirm);
       cancelButton?.removeEventListener('click', onCancel);
-      if (confirmed) {
-        sessionStorage.setItem(ORDER_FLOW_SEEN_KEY, 'true');
-      }
+      closeButton?.removeEventListener('click', onCancel);
       resolve(confirmed);
     };
 
@@ -155,6 +155,7 @@ function showOrderFlowModalOnce() {
 
     confirmButton?.addEventListener('click', onConfirm);
     cancelButton?.addEventListener('click', onCancel);
+    closeButton?.addEventListener('click', onCancel);
   });
 }
 
@@ -166,7 +167,7 @@ async function placeOrder(kitId, kitName) {
     return;
   }
 
-  const confirmed = await showOrderFlowModalOnce();
+  const confirmed = await showOrderFlowModalAfterClick();
   if (!confirmed) {
     return;
   }

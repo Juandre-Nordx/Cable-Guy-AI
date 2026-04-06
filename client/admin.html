@@ -226,12 +226,30 @@
                         <input type="checkbox" name="needs_technician" />
                         Needs technician
                       </label>
+                      <label data-role="wizard-recommended-field">
+                        Recommended Products / Kits / Services
+                        <select name="recommended_items" id="wizard-recommended-items" multiple size="8"></select>
+                      </label>
+                      <p class="subtext">Tip: Hold Ctrl/Cmd to select multiple items.</p>
                       <div class="section-header-row">
                         <button class="button primary" type="submit">Save</button>
                         <button class="button secondary" id="wizard-delete-node" type="button">Delete</button>
                       </div>
                       <p id="wizard-node-message" class="subtext"></p>
                     </form>
+
+                    <section class="node-connections-editor">
+                      <div class="section-header-row">
+                        <h5>Connections</h5>
+                        <button class="button primary" id="wizard-node-add-connection" type="button">Add Connection</button>
+                      </div>
+                      <div class="wizard-connection-toolbar">
+                        <label>Label<input id="wizard-node-connection-label" type="text" placeholder="Yes / No / Fibre" /></label>
+                        <label>Target node<select id="wizard-node-connection-target"></select></label>
+                      </div>
+                      <p id="wizard-node-connections-message" class="subtext"></p>
+                      <div id="wizard-node-connections-list"></div>
+                    </section>
                   </section>
                 </div>
               </section>

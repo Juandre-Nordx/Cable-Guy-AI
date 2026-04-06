@@ -14,11 +14,11 @@ const state = {
   wizard: {
     nodes: [],
     edges: [],
-    selectedConnections: [],
     selectedNodeId: null,
     selectedEdgeId: null,
-    connectMode: false,
-    connectSourceId: null
+    activeTab: 'nodes',
+    connectionFilterNodeId: 'all',
+    collapsedNodeIds: new Set()
   }
 };
 
@@ -42,7 +42,9 @@ function bindLayoutEvents() {
   document.getElementById('refresh-services').addEventListener('click', loadServices);
   document.getElementById('refresh-wizard').addEventListener('click', loadWizardBuilder);
   document.getElementById('wizard-add-node').addEventListener('click', createWizardNodeDraft);
-  document.getElementById('wizard-connect-mode').addEventListener('click', toggleWizardConnectMode);
+  document.getElementById('wizard-add-connection').addEventListener('click', handleAddConnection);
+  document.getElementById('wizard-connection-filter').addEventListener('change', handleConnectionFilterChange);
+  document.querySelectorAll('[data-wizard-tab]').forEach((tab) => tab.addEventListener('click', () => activateWizardTab(tab.dataset.wizardTab)));
 }
 
 function bindFormEvents() {
@@ -51,7 +53,6 @@ function bindFormEvents() {
   document.getElementById('service-form').addEventListener('submit', submitService);
   document.getElementById('wizard-node-form').addEventListener('submit', submitWizardNode);
   document.getElementById('wizard-delete-node').addEventListener('click', deleteWizardNodeBySelection);
-  document.getElementById('wizard-edge-form').addEventListener('submit', submitWizardEdge);
   document.querySelector('#wizard-node-form select[name="type"]').addEventListener('change', toggleWizardResultFields);
 }
 
@@ -478,52 +479,50 @@ function renderServicesTable() {
 }
 
 async function loadWizardBuilder() {
-  const [nodesPayload, edgesPayload] = await Promise.all([apiFetch('/admin/wizard/nodes'), apiFetch('/admin/wizard/edges')]);
-  state.wizard.nodes = nodesPayload.nodes || [];
-  state.wizard.edges = edgesPayload.edges || [];
+  try {
+    const [nodesPayload, edgesPayload] = await Promise.all([apiFetch('/admin/wizard/nodes'), apiFetch('/admin/wizard/edges')]);
+    state.wizard.nodes = nodesPayload.nodes || [];
+    state.wizard.edges = edgesPayload.edges || [];
 
-  if (!state.wizard.nodes.some((node) => node.id === state.wizard.selectedNodeId)) {
-    state.wizard.selectedNodeId = state.wizard.nodes[0]?.id || null;
+    if (!state.wizard.nodes.some((node) => node.id === state.wizard.selectedNodeId)) {
+      state.wizard.selectedNodeId = state.wizard.nodes[0]?.id || null;
+    }
+
+    if (!state.wizard.nodes.some((node) => String(node.id) === String(state.wizard.connectionFilterNodeId))) {
+      state.wizard.connectionFilterNodeId = 'all';
+    }
+
+    renderWizardBuilder();
+  } catch (error) {
+    setGlobalMessage(error.message || 'Failed to load wizard builder.', 'warning');
   }
-
-  renderWizardBuilder();
-  await loadWizardConnections(state.wizard.selectedNodeId);
 }
 
 function renderWizardBuilder() {
-  renderWizardNodeList();
-  renderWizardGraph();
-  renderWizardNodeEditor();
-  renderWizardEdgeEditor();
-  updateWizardConnectModeButton();
+  renderNodes();
+  renderNodeEditor();
+  renderConnections();
+  renderTree();
+  renderWizardTabs();
 }
 
-async function loadWizardConnections(nodeId) {
-  const edgeList = document.getElementById('wizard-edge-list');
-  const countLabel = document.getElementById('wizard-connection-count');
-  if (!nodeId) {
-    state.wizard.selectedConnections = [];
-    countLabel.textContent = '0';
-    edgeList.innerHTML = '<p class="subtext">Select a node to manage connections.</p>';
-    return;
-  }
-
-  try {
-    const payload = await apiFetch(`/admin/wizard/edges?node_id=${nodeId}`);
-    state.wizard.selectedConnections = payload.edges || [];
-    if (!state.wizard.selectedConnections.some((edge) => edge.id === state.wizard.selectedEdgeId)) {
-      state.wizard.selectedEdgeId = null;
-    }
-    renderExistingConnections();
-  } catch (error) {
-    state.wizard.selectedConnections = [];
-    state.wizard.selectedEdgeId = null;
-    countLabel.textContent = '0';
-    edgeList.innerHTML = `<p class="warning">${error.message}</p>`;
-  }
+function activateWizardTab(tabName) {
+  state.wizard.activeTab = tabName;
+  renderWizardTabs();
 }
 
-function renderWizardNodeList() {
+function renderWizardTabs() {
+  document.querySelectorAll('[data-wizard-tab]').forEach((tabButton) => {
+    const active = tabButton.dataset.wizardTab === state.wizard.activeTab;
+    tabButton.classList.toggle('active', active);
+  });
+
+  document.querySelectorAll('.wizard-tab-panel').forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `wizard-tab-${state.wizard.activeTab}`);
+  });
+}
+
+function renderNodes() {
   const list = document.getElementById('wizard-node-list');
   if (!state.wizard.nodes.length) {
     list.innerHTML = '<p class="subtext">No nodes yet.</p>';
@@ -542,13 +541,11 @@ function renderWizardNodeList() {
     .join('');
 
   document.querySelectorAll('[data-wizard-node]').forEach((button) => {
-    button.addEventListener('click', () => {
-      handleWizardNodeClick(Number(button.dataset.wizardNode));
-    });
+    button.addEventListener('click', () => handleWizardNodeClick(Number(button.dataset.wizardNode)));
   });
 }
 
-function renderWizardNodeEditor() {
+function renderNodeEditor() {
   const form = document.getElementById('wizard-node-form');
   const node = state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId);
   const messageLabel = form.querySelector('[data-role="wizard-message-field"]');
@@ -569,240 +566,192 @@ function renderWizardNodeEditor() {
   toggleWizardResultFields();
 }
 
-function renderWizardEdgeEditor() {
-  const node = state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId);
-  const targetSelect = document.getElementById('wizard-edge-target');
-  const edgeList = document.getElementById('wizard-edge-list');
-
-  const options = state.wizard.nodes
-    .filter((entry) => entry.id !== state.wizard.selectedNodeId)
-    .map((entry) => `<option value="${entry.id}">${escapeHtml(entry.title)} (#${entry.id})</option>`)
-    .join('');
-
-  targetSelect.innerHTML = options || '<option value="">No target nodes</option>';
-
-  if (!node) {
-    edgeList.innerHTML = '<p class="subtext">Select a node to edit connections.</p>';
-    return;
-  }
-  renderExistingConnections();
+function renderConnections() {
+  renderConnectionFilter();
+  renderConnectionsTable();
 }
 
-function renderExistingConnections() {
-  const edgeList = document.getElementById('wizard-edge-list');
-  const countLabel = document.getElementById('wizard-connection-count');
-  const currentNodeId = state.wizard.selectedNodeId;
-
-  if (!currentNodeId) {
-    countLabel.textContent = '0';
-    edgeList.innerHTML = '<p class="subtext">Select a node to manage connections.</p>';
-    return;
-  }
-
-  const outgoing = state.wizard.selectedConnections || [];
-  countLabel.textContent = `${outgoing.length}`;
-
-  if (!outgoing.length) {
-    edgeList.innerHTML = '<p class="subtext">No outgoing connections yet.</p>';
-    return;
-  }
-
-  edgeList.innerHTML = outgoing
-    .map((edge) => {
-      const targetOptions = state.wizard.nodes
-        .filter((entry) => entry.id !== currentNodeId)
-        .map(
-          (entry) => `<option value="${entry.id}" ${entry.id === edge.to_node_id ? 'selected' : ''}>${escapeHtml(entry.title)} (#${entry.id})</option>`
-        )
-        .join('');
-
-      return `
-        <div class="wizard-edge-pill wizard-edge-edit ${edge.id === state.wizard.selectedEdgeId ? 'selected' : ''}" data-edge-row="${edge.id}">
-          <input type="text" value="${escapeHtml(edge.label)}" data-edge-label="${edge.id}" />
-          <select data-edge-target="${edge.id}">${targetOptions}</select>
-          <button class="button primary" type="button" data-save-edge="${edge.id}">Save</button>
-          <button class="button secondary" type="button" data-delete-edge="${edge.id}">Delete</button>
-        </div>
-      `;
-    })
+function renderConnectionFilter() {
+  const filter = document.getElementById('wizard-connection-filter');
+  const options = [`<option value="all">All nodes</option>`]
+    .concat(state.wizard.nodes.map((node) => `<option value="${node.id}">${escapeHtml(node.title)} (#${node.id})</option>`))
     .join('');
+
+  filter.innerHTML = options;
+  filter.value = String(state.wizard.connectionFilterNodeId);
+}
+
+function renderConnectionsTable() {
+  const edgeList = document.getElementById('wizard-edge-list');
+  const nodeMap = new Map(state.wizard.nodes.map((node) => [node.id, node]));
+  const filterId = state.wizard.connectionFilterNodeId === 'all' ? null : Number(state.wizard.connectionFilterNodeId);
+  const edges = filterId ? state.wizard.edges.filter((edge) => edge.from_node_id === filterId || edge.to_node_id === filterId) : state.wizard.edges;
+
+  if (!edges.length) {
+    edgeList.innerHTML = '<p class="subtext">No connections found for current filter.</p>';
+    return;
+  }
+
+  edgeList.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>From Node</th>
+          <th>Label</th>
+          <th>To Node</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${edges
+          .map((edge) => {
+            const targets = state.wizard.nodes
+              .filter((node) => node.id !== edge.from_node_id)
+              .map((node) => `<option value="${node.id}" ${node.id === edge.to_node_id ? 'selected' : ''}>${escapeHtml(node.title)} (#${node.id})</option>`)
+              .join('');
+            return `
+              <tr class="${edge.id === state.wizard.selectedEdgeId ? 'wizard-connection-row-selected' : ''}" data-edge-row="${edge.id}">
+                <td>${escapeHtml(nodeMap.get(edge.from_node_id)?.title || `Node #${edge.from_node_id}`)}</td>
+                <td><input type="text" value="${escapeHtml(edge.label)}" data-edge-label="${edge.id}" /></td>
+                <td><select data-edge-target="${edge.id}">${targets}</select></td>
+                <td>
+                  <div class="admin-order-actions">
+                    <button class="button primary" type="button" data-save-edge="${edge.id}">Save</button>
+                    <button class="button secondary" type="button" data-delete-edge="${edge.id}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join('')}
+      </tbody>
+    </table>
+  `;
 
   document.querySelectorAll('[data-save-edge]').forEach((button) => {
     button.addEventListener('click', () => updateWizardEdge(Number(button.dataset.saveEdge)));
   });
-
   document.querySelectorAll('[data-delete-edge]').forEach((button) => {
     button.addEventListener('click', () => deleteWizardEdge(Number(button.dataset.deleteEdge), true));
   });
 }
 
-function renderWizardGraph() {
-  const graph = document.getElementById('wizard-graph');
-  if (!state.wizard.nodes.length) {
-    graph.innerHTML = '<p class="subtext">Create your first node to start building the tree.</p>';
-    return;
-  }
-
-  const layout = computeWizardLayout();
-  const nodeBoxes = state.wizard.nodes
-    .map((node) => {
-      const position = layout.get(node.id) || { x: 20, y: 20 };
-      return `
-        <button
-          type="button"
-          class="wizard-node-box ${node.type} ${node.id === state.wizard.selectedNodeId ? 'selected' : ''}"
-          style="left:${position.x}px; top:${position.y}px;"
-          data-wizard-graph-node="${node.id}"
-        >
-          <strong>${escapeHtml(node.title)}</strong>
-          <div class="wizard-node-type">${node.type}</div>
-        </button>
-      `;
-    })
-    .join('');
-
-  const edgeLines = state.wizard.edges
-    .map((edge) => {
-      const from = layout.get(edge.from_node_id);
-      const to = layout.get(edge.to_node_id);
-      if (!from || !to) return '';
-      const x1 = from.x + 180;
-      const y1 = from.y + 35;
-      const x2 = to.x;
-      const y2 = to.y + 35;
-      const labelX = (x1 + x2) / 2;
-      const labelY = (y1 + y2) / 2 - 6;
-      return `
-        <g class="wizard-edge-line ${edge.id === state.wizard.selectedEdgeId ? 'selected' : ''}" data-wizard-graph-edge="${edge.id}">
-          <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#334155" stroke-width="2"></line>
-          <text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="11" text-anchor="middle">${escapeHtml(edge.label)}</text>
-        </g>
-      `;
-    })
-    .join('');
-
-  graph.innerHTML = `
-    <svg viewBox="0 0 1500 1200" preserveAspectRatio="none">${edgeLines}</svg>
-    ${nodeBoxes}
-  `;
-
-  document.querySelectorAll('[data-wizard-graph-node]').forEach((button) => {
-    button.addEventListener('click', () => handleWizardNodeClick(Number(button.dataset.wizardGraphNode)));
-  });
-
-  document.querySelectorAll('[data-wizard-graph-edge]').forEach((edgeEl) => {
-    edgeEl.addEventListener('click', () => {
-      openWizardEdgeFromGraph(Number(edgeEl.dataset.wizardGraphEdge));
-    });
-  });
-}
-
-function computeWizardLayout() {
-  const outgoingMap = new Map();
+function buildWizardTreeData() {
+  const nodeMap = new Map(state.wizard.nodes.map((node) => [node.id, node]));
+  const outgoingMap = new Map(state.wizard.nodes.map((node) => [node.id, []]));
   const incomingCount = new Map(state.wizard.nodes.map((node) => [node.id, 0]));
 
   for (const edge of state.wizard.edges) {
     if (!outgoingMap.has(edge.from_node_id)) outgoingMap.set(edge.from_node_id, []);
-    outgoingMap.get(edge.from_node_id).push(edge.to_node_id);
+    outgoingMap.get(edge.from_node_id).push(edge);
     incomingCount.set(edge.to_node_id, (incomingCount.get(edge.to_node_id) || 0) + 1);
   }
 
-  const roots = state.wizard.nodes.filter((node) => (incomingCount.get(node.id) || 0) === 0).map((node) => node.id);
-  const queue = roots.length ? [...roots] : [state.wizard.nodes[0].id];
-  const depth = new Map(queue.map((id) => [id, 0]));
-
-  while (queue.length) {
-    const currentId = queue.shift();
-    const nextDepth = (depth.get(currentId) || 0) + 1;
-    for (const nextId of outgoingMap.get(currentId) || []) {
-      if (!depth.has(nextId) || nextDepth < depth.get(nextId)) {
-        depth.set(nextId, nextDepth);
-        queue.push(nextId);
-      }
-    }
-  }
-
-  for (const node of state.wizard.nodes) {
-    if (!depth.has(node.id)) depth.set(node.id, 0);
-  }
-
-  const columns = new Map();
-  for (const node of state.wizard.nodes) {
-    const column = depth.get(node.id) || 0;
-    if (!columns.has(column)) columns.set(column, []);
-    columns.get(column).push(node.id);
-  }
-
-  const layout = new Map();
-  const sortedColumns = Array.from(columns.keys()).sort((a, b) => a - b);
-  for (const column of sortedColumns) {
-    const ids = columns.get(column);
-    ids.forEach((id, rowIndex) => {
-      layout.set(id, { x: 30 + column * 240, y: 30 + rowIndex * 110 });
-    });
-  }
-
-  return layout;
+  const roots = state.wizard.nodes.filter((node) => (incomingCount.get(node.id) || 0) === 0);
+  const rootNode = roots[0] || state.wizard.nodes[0] || null;
+  return { nodeMap, outgoingMap, rootNode, rootsCount: roots.length || (rootNode ? 1 : 0) };
 }
 
-function handleWizardNodeClick(nodeId) {
-  if (state.wizard.connectMode) {
-    if (!state.wizard.connectSourceId) {
-      state.wizard.connectSourceId = nodeId;
-      setFormMessage('wizard-edge-message', `Connection source selected: node #${nodeId}. Now click the target node.`, 'subtext');
-      return;
-    }
+function renderTree() {
+  const graph = document.getElementById('wizard-graph');
+  const summary = document.getElementById('wizard-graph-summary');
 
-    if (state.wizard.connectSourceId === nodeId) {
-      setFormMessage('wizard-edge-message', 'Choose a different target node.', 'warning');
-      return;
-    }
-
-    const label = window.prompt('Connection label (example: Yes, No, Fibre):');
-    if (!label?.trim()) return;
-
-    createWizardEdge({ from_node_id: state.wizard.connectSourceId, to_node_id: nodeId, label: label.trim() });
-    state.wizard.connectSourceId = null;
+  if (!state.wizard.nodes.length) {
+    graph.innerHTML = '<p class="subtext">Create your first node to start building the tree.</p>';
+    summary.textContent = '';
     return;
   }
 
+  const { nodeMap, outgoingMap, rootNode, rootsCount } = buildWizardTreeData();
+  summary.textContent = rootNode ? `Root: ${rootNode.title} ${rootsCount > 1 ? `(showing primary of ${rootsCount} roots)` : ''}` : '';
+
+  if (!rootNode) {
+    graph.innerHTML = '<p class="warning">No root node found.</p>';
+    return;
+  }
+
+  const visited = new Set();
+  graph.innerHTML = `<div class="wizard-tree">${renderTreeNode(rootNode.id, nodeMap, outgoingMap, visited)}</div>`;
+
+  document.querySelectorAll('[data-wizard-tree-node]').forEach((button) => {
+    button.addEventListener('click', () => handleWizardNodeClick(Number(button.dataset.wizardTreeNode), true));
+  });
+
+  document.querySelectorAll('[data-toggle-branch]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleBranchCollapse(Number(button.dataset.toggleBranch));
+    });
+  });
+}
+
+function renderTreeNode(nodeId, nodeMap, outgoingMap, visited) {
+  if (visited.has(nodeId)) {
+    return `<li><div class="wizard-tree-cycle">Cycle detected at node #${nodeId}</div></li>`;
+  }
+
+  visited.add(nodeId);
+  const node = nodeMap.get(nodeId);
+  const children = outgoingMap.get(nodeId) || [];
+  const collapsed = state.wizard.collapsedNodeIds.has(nodeId);
+
+  const childrenMarkup = !collapsed && children.length
+    ? `<ul>${children
+        .map((edge) => {
+          const label = escapeHtml(edge.label || 'Option');
+          const childVisited = new Set(visited);
+          return `<li>
+            <div class="wizard-tree-link-label">${label}</div>
+            ${renderTreeNode(edge.to_node_id, nodeMap, outgoingMap, childVisited)}
+          </li>`;
+        })
+        .join('')}</ul>`
+    : '';
+
+  const collapseButton = children.length
+    ? `<button class="wizard-branch-toggle" type="button" data-toggle-branch="${node.id}">${collapsed ? '+' : '−'}</button>`
+    : '';
+
+  return `
+    <div class="wizard-tree-node-wrap">
+      <button type="button" class="wizard-tree-node ${node.id === state.wizard.selectedNodeId ? 'selected' : ''} ${node.type}" data-wizard-tree-node="${node.id}">
+        ${collapseButton}
+        <strong>${escapeHtml(node.title)}</strong>
+        <span>#${node.id} • ${escapeHtml(node.type)}</span>
+      </button>
+      ${childrenMarkup}
+    </div>
+  `;
+}
+
+function toggleBranchCollapse(nodeId) {
+  if (state.wizard.collapsedNodeIds.has(nodeId)) {
+    state.wizard.collapsedNodeIds.delete(nodeId);
+  } else {
+    state.wizard.collapsedNodeIds.add(nodeId);
+  }
+  renderTree();
+}
+
+function handleConnectionFilterChange(event) {
+  state.wizard.connectionFilterNodeId = event.currentTarget.value;
+  renderConnectionsTable();
+}
+
+function handleWizardNodeClick(nodeId, jumpToEditor = false) {
   state.wizard.selectedNodeId = nodeId;
   state.wizard.selectedEdgeId = null;
+  if (jumpToEditor) {
+    state.wizard.activeTab = 'nodes';
+  }
   renderWizardBuilder();
-  loadWizardConnections(nodeId);
-}
-
-async function openWizardEdgeFromGraph(edgeId) {
-  const edge = state.wizard.edges.find((entry) => entry.id === edgeId);
-  if (!edge) return;
-
-  state.wizard.selectedNodeId = edge.from_node_id;
-  state.wizard.selectedEdgeId = edgeId;
-  renderWizardBuilder();
-  await loadWizardConnections(edge.from_node_id);
-  const row = document.querySelector(`[data-edge-row="${edgeId}"]`);
-  row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  setFormMessage('wizard-edge-message', `Editing connection #${edgeId}.`, 'subtext');
-}
-
-function toggleWizardConnectMode() {
-  state.wizard.connectMode = !state.wizard.connectMode;
-  state.wizard.connectSourceId = null;
-  updateWizardConnectModeButton();
-  setFormMessage('wizard-edge-message', state.wizard.connectMode ? 'Connect mode enabled. Click source node then target node.' : '', 'subtext');
-}
-
-function updateWizardConnectModeButton() {
-  const button = document.getElementById('wizard-connect-mode');
-  button.textContent = `Connect: ${state.wizard.connectMode ? 'On' : 'Off'}`;
-  button.classList.toggle('primary', state.wizard.connectMode);
-  button.classList.toggle('secondary', !state.wizard.connectMode);
 }
 
 function toggleWizardResultFields() {
   const form = document.getElementById('wizard-node-form');
+  if (!form) return;
   const isResult = form.elements.type.value === 'result';
-  form.querySelector('[data-role="wizard-message-field"]').classList.toggle('hidden', !isResult);
+  form.querySelector('[data-role="wizard-message-field"]')?.classList.toggle('hidden', !isResult);
 }
 
 function createWizardNodeDraft() {
@@ -812,6 +761,7 @@ function createWizardNodeDraft() {
   form.elements.type.value = 'question';
   toggleWizardResultFields();
   state.wizard.selectedNodeId = null;
+  state.wizard.activeTab = 'nodes';
   renderWizardBuilder();
 }
 
@@ -870,20 +820,28 @@ async function deleteWizardNodeBySelection() {
   }
 }
 
-async function submitWizardEdge(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const fromNodeId = state.wizard.selectedNodeId;
-  const toNodeId = Number(form.elements.to_node_id.value);
-  const label = form.elements.label.value.trim();
-
-  if (!fromNodeId) {
-    setFormMessage('wizard-edge-message', 'Select a source node first.', 'warning');
+async function handleAddConnection() {
+  if (!state.wizard.nodes.length) {
+    setFormMessage('wizard-edge-message', 'Create nodes before adding connections.', 'warning');
     return;
   }
 
-  await createWizardEdge({ from_node_id: fromNodeId, to_node_id: toNodeId, label });
-  form.reset();
+  const fromNodeId = state.wizard.selectedNodeId || state.wizard.nodes[0].id;
+  const candidates = state.wizard.nodes.filter((node) => node.id !== fromNodeId);
+
+  if (!candidates.length) {
+    setFormMessage('wizard-edge-message', 'Add at least one more node to connect.', 'warning');
+    return;
+  }
+
+  const defaultTarget = candidates[0].id;
+  const label = window.prompt('Connection label (example: Yes, No, Fibre):', 'Yes');
+  if (!label || !label.trim()) {
+    setFormMessage('wizard-edge-message', 'Connection label is required.', 'warning');
+    return;
+  }
+
+  await createWizardEdge({ from_node_id: fromNodeId, to_node_id: defaultTarget, label: label.trim() });
 }
 
 async function createWizardEdge(payload) {
@@ -896,7 +854,6 @@ async function createWizardEdge(payload) {
 
     setFormMessage('wizard-edge-message', 'Connection created.', 'success');
     await loadWizardBuilder();
-    await loadWizardConnections(state.wizard.selectedNodeId);
   } catch (error) {
     setFormMessage('wizard-edge-message', error.message, 'warning');
   }
@@ -918,7 +875,6 @@ async function updateWizardEdge(edgeId) {
 
     setFormMessage('wizard-edge-message', 'Connection updated.', 'success');
     await loadWizardBuilder();
-    await loadWizardConnections(state.wizard.selectedNodeId);
   } catch (error) {
     setFormMessage('wizard-edge-message', error.message, 'warning');
   }
@@ -937,7 +893,6 @@ async function deleteWizardEdge(edgeId, confirmDelete = false) {
     }
     setFormMessage('wizard-edge-message', 'Connection deleted.', 'success');
     await loadWizardBuilder();
-    await loadWizardConnections(state.wizard.selectedNodeId);
   } catch (error) {
     setFormMessage('wizard-edge-message', error.message, 'warning');
   }

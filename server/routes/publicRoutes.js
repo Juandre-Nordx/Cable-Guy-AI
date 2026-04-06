@@ -78,7 +78,20 @@ router.get('/products', async (_req, res) => {
 
 router.get('/services', async (_req, res) => {
   try {
-    const result = await query('SELECT * FROM services ORDER BY id DESC;');
+    const result = await query(
+      `
+      WITH current_currency AS (
+        SELECT COALESCE(
+          (SELECT value FROM settings WHERE key = 'currency' LIMIT 1),
+          'ZAR'
+        ) AS currency
+      )
+      SELECT s.*, cc.currency
+      FROM services s
+      CROSS JOIN current_currency cc
+      ORDER BY s.id DESC;
+      `
+    );
     return res.json({ success: true, services: result.rows });
   } catch (error) {
     console.error('[GET /services] Failed:', error.message);

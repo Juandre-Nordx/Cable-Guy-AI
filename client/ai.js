@@ -1,3 +1,5 @@
+const session = requireAuth();
+
 const wizardForm = document.getElementById('wizard-form');
 const wizardResult = document.getElementById('wizard-result');
 const wizardQuestion = document.getElementById('wizard-question');
@@ -84,20 +86,14 @@ function renderWizardResult(payload) {
     <p class="subtext">${payload.message}</p>
     ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : '<p class="success">✅ No onsite technician required.</p>'}
     <div class="kit-card-actions">
-      <a class="button secondary" href="${viewKitLink}">View Kit</a>
-      <button id="continue-chat" class="button primary" type="button">Continue with AI Assistant</button>
+      <a class="button secondary" href="${viewKitLink}">Visit Store</a>
+      <button id="book-teck" class="button primary" type="button">Book a teck</button>
     </div>
   `;
 
-  document.getElementById('continue-chat')?.addEventListener('click', () => {
-    chatShell.classList.remove('hidden');
-    const starter = `Wizard context: ${payload.message}. Category=${payload.category || 'general'}, needs_technician=${payload.needsTechnician}. Please provide deeper setup guidance.`;
-    if (!chatContainer.childElementCount) {
-      renderMessage('Hi, I am Cable Guy AI. Tell me what is happening with your WiFi and I will guide your diagnosis.', 'ai');
-    }
-    renderMessage(starter, 'user');
-    input.value = starter;
-    chatShell.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('book-teck')?.addEventListener('click', () => {
+    bookingSection.classList.remove('hidden');
+    bookingSection.scrollIntoView({ behavior: 'smooth' });
   });
 }
 
@@ -185,76 +181,78 @@ async function sendChat(message) {
   return payload;
 }
 
-chatForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const message = input.value.trim();
+if (session) {
+  chatForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = input.value.trim();
 
-  if (!message) return;
+    if (!message) return;
 
-  renderMessage(message, 'user');
-  input.value = '';
-  sendButton.disabled = true;
+    renderMessage(message, 'user');
+    input.value = '';
+    sendButton.disabled = true;
 
-  try {
-    const payload = await sendChat(message);
-    renderMessage(payload.reply, 'ai');
+    try {
+      const payload = await sendChat(message);
+      renderMessage(payload.reply, 'ai');
 
-    if (payload.recommendedKit) {
-      renderKitCard(payload.recommendedKit);
+      if (payload.recommendedKit) {
+        renderKitCard(payload.recommendedKit);
+      }
+
+      if (payload.needsTechnician) {
+        renderTechnicianPrompt();
+      }
+    } catch (error) {
+      renderMessage(`Error: ${error.message}`, 'ai');
+    } finally {
+      sendButton.disabled = false;
+      input.focus();
+    }
+  });
+
+  bookingForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const body = {
+      name: document.getElementById('booking-name').value.trim(),
+      phone: document.getElementById('booking-phone').value.trim(),
+      address: document.getElementById('booking-address').value.trim(),
+      kit_id: Number(document.getElementById('booking-kit-id').value || 0)
+    };
+
+    if (!body.kit_id) {
+      delete body.kit_id;
     }
 
-    if (payload.needsTechnician) {
-      renderTechnicianPrompt();
+    try {
+      const response = await fetch('/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Booking request failed.');
+      }
+
+      bookingResult.textContent = `Booking created successfully. Reference #${payload.booking.id}`;
+      bookingResult.className = 'success';
+      bookingForm.reset();
+    } catch (error) {
+      bookingResult.textContent = `Error: ${error.message}`;
+      bookingResult.className = 'warning';
     }
-  } catch (error) {
-    renderMessage(`Error: ${error.message}`, 'ai');
-  } finally {
-    sendButton.disabled = false;
-    input.focus();
-  }
-});
+  });
 
-bookingForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
+  wizardForm.addEventListener('submit', (event) => event.preventDefault());
+  wizardResetButton?.addEventListener('click', () => {
+    wizardState.currentNodeId = wizardState.rootNodeId;
+    wizardResult.classList.add('hidden');
+    renderCurrentWizardNode();
+  });
 
-  const body = {
-    name: document.getElementById('booking-name').value.trim(),
-    phone: document.getElementById('booking-phone').value.trim(),
-    address: document.getElementById('booking-address').value.trim(),
-    kit_id: Number(document.getElementById('booking-kit-id').value || 0)
-  };
-
-  if (!body.kit_id) {
-    delete body.kit_id;
-  }
-
-  try {
-    const response = await fetch('/bookings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || 'Booking request failed.');
-    }
-
-    bookingResult.textContent = `Booking created successfully. Reference #${payload.booking.id}`;
-    bookingResult.className = 'success';
-    bookingForm.reset();
-  } catch (error) {
-    bookingResult.textContent = `Error: ${error.message}`;
-    bookingResult.className = 'warning';
-  }
-});
-
-wizardForm.addEventListener('submit', (event) => event.preventDefault());
-wizardResetButton?.addEventListener('click', () => {
-  wizardState.currentNodeId = wizardState.rootNodeId;
-  wizardResult.classList.add('hidden');
-  renderCurrentWizardNode();
-});
-
-loadWizardTree();
+  loadWizardTree();
+}

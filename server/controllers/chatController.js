@@ -107,13 +107,46 @@ async function wizardTree(_req, res) {
 
     const [productsResult, kitsResult, servicesResult] = await Promise.all([
       recommendedByType.products.size
-        ? query('SELECT id, name, price, image_url, category FROM products WHERE id = ANY($1::int[]);', [[...recommendedByType.products]])
+        ? query(
+          `
+          WITH current_currency AS (
+            SELECT COALESCE((SELECT value FROM settings WHERE key = 'currency' LIMIT 1), 'ZAR') AS currency
+          )
+          SELECT p.id, p.name, p.price, p.image_url, p.category, cc.currency
+          FROM products p
+          CROSS JOIN current_currency cc
+          WHERE p.id = ANY($1::int[]);
+          `,
+          [[...recommendedByType.products]]
+        )
         : { rows: [] },
       recommendedByType.kits.size
-        ? query('SELECT id, name, price, image_url, category FROM kits WHERE id = ANY($1::int[]);', [[...recommendedByType.kits]])
+        ? query(
+          `
+          WITH current_currency AS (
+            SELECT COALESCE((SELECT value FROM settings WHERE key = 'currency' LIMIT 1), 'ZAR') AS currency
+          )
+          SELECT k.id, k.name, k.price, k.image_url, k.category, cc.currency
+          FROM kits k
+          CROSS JOIN current_currency cc
+          WHERE k.id = ANY($1::int[]);
+          `,
+          [[...recommendedByType.kits]]
+        )
         : { rows: [] },
       recommendedByType.services.size
-        ? query('SELECT id, name, price, NULL::text AS image_url, NULL::text AS category FROM services WHERE id = ANY($1::int[]);', [[...recommendedByType.services]])
+        ? query(
+          `
+          WITH current_currency AS (
+            SELECT COALESCE((SELECT value FROM settings WHERE key = 'currency' LIMIT 1), 'ZAR') AS currency
+          )
+          SELECT s.id, s.name, s.price, NULL::text AS image_url, NULL::text AS category, cc.currency
+          FROM services s
+          CROSS JOIN current_currency cc
+          WHERE s.id = ANY($1::int[]);
+          `,
+          [[...recommendedByType.services]]
+        )
         : { rows: [] }
     ]);
 
@@ -174,7 +207,19 @@ async function chat(req, res) {
 
     let kit = null;
     if (recommendedCategory) {
-      const result = await query('SELECT * FROM kits WHERE category = $1 LIMIT 1;', [recommendedCategory]);
+      const result = await query(
+        `
+        WITH current_currency AS (
+          SELECT COALESCE((SELECT value FROM settings WHERE key = 'currency' LIMIT 1), 'ZAR') AS currency
+        )
+        SELECT k.*, cc.currency
+        FROM kits k
+        CROSS JOIN current_currency cc
+        WHERE k.category = $1
+        LIMIT 1;
+        `,
+        [recommendedCategory]
+      );
       kit = result.rows[0] || null;
     }
 

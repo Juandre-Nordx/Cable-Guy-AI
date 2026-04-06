@@ -6,8 +6,8 @@ const highlightedCategory = query.get('category');
 const highlightedProductId = Number(query.get('product_id') || 0);
 const highlightedKitId = Number(query.get('kit_id') || 0);
 const highlightedServiceId = Number(query.get('service_id') || 0);
-const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
 let showOrderPopup = false;
+let popupResolve = null;
 
 function escapeHtml(text = '') {
   return text
@@ -72,7 +72,7 @@ function renderKit(kit) {
     ${kit.requires_technician ? '<p class="warning">⚠️ Recommended: Professional Installation</p>' : ''}
     <p><strong>Category:</strong> ${kit.category}</p>
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
-    <p><strong>Price:</strong> ${formatPrice(kit.price, kit.currency)}</p>
+    <p><strong>Price:</strong> ${formatCurrency(kit.price, kit.currency)}</p>
     <div class="kit-card-actions">
       <button class="button secondary" data-toggle-details="${detailsId}">View Details</button>
       <button class="button primary" data-kit-id="${kit.id}">Place Order</button>
@@ -110,27 +110,38 @@ function renderProduct(product) {
     <h3>${product.name}</h3>
     <p class="subtext">${product.description || ''}</p>
     <p><strong>Category:</strong> ${product.category}</p>
-    <p><strong>Price:</strong> ${formatPrice(product.price, product.currency)}</p>
+    <p><strong>Price:</strong> ${formatCurrency(product.price, product.currency)}</p>
   `;
 
   return card;
 }
 
-function formatPrice(amount, currency = 'ZAR') {
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount)) return '-';
+function formatCurrency(price, currency = 'ZAR') {
+  const numericPrice = Number(price);
+  if (!Number.isFinite(numericPrice)) return '-';
+  if (currency === 'ZAR') return `R ${numericPrice.toFixed(2)}`;
+  if (currency === 'USD') return `$ ${numericPrice.toFixed(2)}`;
+  return `${numericPrice.toFixed(2)}`;
+}
 
-  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
-  const formatted = numericAmount.toLocaleString(undefined, {
-    minimumFractionDigits: Number.isInteger(numericAmount) ? 0 : 2,
-    maximumFractionDigits: 2
-  });
-  return `${symbol} ${formatted}`;
+function lockBodyScroll(shouldLock) {
+  document.body.style.overflow = shouldLock ? 'hidden' : '';
 }
 
 function toggleOrderFlowModal() {
   if (!orderFlowModal) return;
   orderFlowModal.classList.toggle('hidden', !showOrderPopup);
+  orderFlowModal.classList.toggle('open', showOrderPopup);
+  lockBodyScroll(showOrderPopup);
+}
+
+function closePopup(confirmed = false) {
+  showOrderPopup = false;
+  toggleOrderFlowModal();
+  if (popupResolve) {
+    popupResolve(confirmed);
+    popupResolve = null;
+  }
 }
 
 function highlightRequestedItems() {
@@ -148,28 +159,11 @@ function highlightRequestedItems() {
 
 function showOrderFlowModalAfterClick() {
   if (!orderFlowModal) return Promise.resolve(true);
+  showOrderPopup = true;
   toggleOrderFlowModal();
 
   return new Promise((resolve) => {
-    const confirmButton = document.getElementById('confirm-order-flow');
-    const cancelButton = document.getElementById('cancel-order-flow');
-    const closeButton = document.getElementById('close-order-flow');
-
-    const cleanup = (confirmed) => {
-      showOrderPopup = false;
-      toggleOrderFlowModal();
-      confirmButton?.removeEventListener('click', onConfirm);
-      cancelButton?.removeEventListener('click', onCancel);
-      closeButton?.removeEventListener('click', onCancel);
-      resolve(confirmed);
-    };
-
-    const onConfirm = () => cleanup(true);
-    const onCancel = () => cleanup(false);
-
-    confirmButton?.addEventListener('click', onConfirm);
-    cancelButton?.addEventListener('click', onCancel);
-    closeButton?.addEventListener('click', onCancel);
+    popupResolve = resolve;
   });
 }
 
@@ -181,7 +175,7 @@ async function placeOrder(kitId, kitName) {
     return;
   }
 
-  showOrderPopup = true;
+  console.log('Popup triggered');
   const confirmed = await showOrderFlowModalAfterClick();
   if (!confirmed) {
     return;
@@ -207,6 +201,30 @@ async function placeOrder(kitId, kitName) {
   } catch (error) {
     window.alert(error.message);
   }
+}
+
+function wirePopupControls() {
+  if (!orderFlowModal) return;
+
+  const confirmButton = document.getElementById('confirm-order-flow');
+  const cancelButton = document.getElementById('cancel-order-flow');
+  const closeButton = document.getElementById('close-order-flow');
+
+  confirmButton?.addEventListener('click', () => closePopup(true));
+  cancelButton?.addEventListener('click', () => closePopup(false));
+  closeButton?.addEventListener('click', () => closePopup(false));
+
+  orderFlowModal.addEventListener('click', (event) => {
+    if (event.target === orderFlowModal) {
+      closePopup(false);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && showOrderPopup) {
+      closePopup(false);
+    }
+  });
 }
 
 async function loadKits() {
@@ -261,4 +279,5 @@ async function loadProducts() {
 
 loadKits();
 loadProducts();
+wirePopupControls();
 toggleOrderFlowModal();

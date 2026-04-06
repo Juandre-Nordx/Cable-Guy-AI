@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cart | Cable Guy AI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top-nav">
+      <a class="brand" href="/index.html">Cable Guy AI</a>
+      <nav>
+        <a href="/store.html">Store</a>
+        <a href="/cart.html" class="active">Cart</a>
+        <a href="/dashboard.html">My Dashboard</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="card">
+        <h1>Your Cart</h1>
+        <p class="subtext">Review your items and complete checkout.</p>
+      </section>
+
+      <section class="card">
+        <div id="cart-items"></div>
+        <hr />
+        <p><strong>Total:</strong> <span id="cart-total">-</span></p>
+        <div class="kit-card-actions">
+          <a class="button secondary" href="/store.html">Continue Shopping</a>
+          <button id="checkout-btn" class="button primary" type="button">Checkout</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="checkoutModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+      <div class="modal-card">
+        <button id="close-checkout-modal" class="modal-close" type="button" aria-label="Close checkout modal">×</button>
+        <h3 id="checkout-title">How your order works</h3>
+        <ol class="order-flow-list">
+          <li>Your order is created immediately.</li>
+          <li>Our team validates stock and service scope.</li>
+          <li>You can track status and notes in your dashboard.</li>
+        </ol>
+        <p class="subtext">Ready to confirm checkout?</p>
+        <div class="kit-card-actions">
+          <button id="confirm-checkout-btn" class="button primary" type="button">Confirm Order</button>
+          <button id="cancel-checkout-btn" class="button secondary" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/auth.js"></script>
+    <script src="/cart.js"></script>
+  </body>
+</html>

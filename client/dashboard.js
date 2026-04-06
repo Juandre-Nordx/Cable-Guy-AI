@@ -10,6 +10,12 @@ if (session) {
   loadOrders();
 }
 
+function formatCurrency(value, currency = 'ZAR') {
+  const amount = Number(value || 0);
+  const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'R';
+  return `${symbol} ${amount.toFixed(2)}`;
+}
+
 async function apiFetch(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -58,6 +64,23 @@ async function renderOrderNotes(orderId) {
   }
 }
 
+function renderOrderItems(items = [], currency = 'ZAR') {
+  if (!items.length) {
+    return '<p class="subtext">No order items found.</p>';
+  }
+
+  return `
+    <ul>
+      ${items
+        .map(
+          (item) =>
+            `<li>${item.name} (${item.type}) x ${item.qty} — ${formatCurrency(Number(item.price) * Number(item.qty), currency)}</li>`
+        )
+        .join('')}
+    </ul>
+  `;
+}
+
 async function loadOrders() {
   const container = document.getElementById('orders-list');
   container.innerHTML = '<p class="subtext">Loading orders...</p>';
@@ -75,8 +98,9 @@ async function loadOrders() {
         (order) => `
           <article class="card">
             <p><strong>Order #${order.id}</strong></p>
-            <p>Kit: ${order.kit_name || 'Unknown'} (${order.kit_category || '-'})</p>
             <p>Status: <strong>${order.status === 'done' ? 'Order Completed' : order.status}</strong></p>
+            <p>Total: <strong>${formatCurrency(order.total, order.currency)}</strong></p>
+            <div>${renderOrderItems(order.items, order.currency)}</div>
             <p class="subtext">Placed: ${new Date(order.created_at).toLocaleString()}</p>
             <div id="order-notes-${order.id}" class="order-notes-feed subtext">Loading notes...</div>
             <form class="order-note-form" data-user-note-form="${order.id}">

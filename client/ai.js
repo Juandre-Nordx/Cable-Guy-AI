@@ -166,6 +166,23 @@ function formatPrice(amount, currency = 'ZAR') {
   return `${symbol}${numericAmount.toFixed(2)}`;
 }
 
+function resolveItemLink(item, action = 'view') {
+  if (item.type === 'product') return `/store.html#product-grid`;
+  if (item.type === 'service') return '/store.html';
+  if (item.type === 'kit') {
+    const base = `/store.html?category=${encodeURIComponent(item.category || '')}`;
+    return action === 'buy' ? `${base}#kit-grid` : base;
+  }
+  return '/store.html';
+}
+
+function formatPrice(amount, currency = 'ZAR') {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return 'Contact us';
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  return `${symbol}${numericAmount.toFixed(2)}`;
+}
+
 function setWizardTree(payload) {
   wizardState.rootNodeId = payload.rootNodeId;
   wizardState.currentNodeId = payload.rootNodeId;

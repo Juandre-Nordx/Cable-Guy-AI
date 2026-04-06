@@ -585,6 +585,18 @@ label {
   gap: 0.45rem;
 }
 
+.wizard-edge-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.wizard-edge-edit input,
+.wizard-edge-edit select {
+  margin: 0;
+}
+
 @media (max-width: 1120px) {
   .wizard-builder-grid {
     grid-template-columns: 1fr;

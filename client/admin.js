@@ -14,6 +14,7 @@ const state = {
   wizard: {
     nodes: [],
     edges: [],
+    selectedConnections: [],
     selectedNodeId: null,
     connectMode: false,
     connectSourceId: null
@@ -485,6 +486,7 @@ async function loadWizardBuilder() {
   }
 
   renderWizardBuilder();
+  await loadWizardConnections(state.wizard.selectedNodeId);
 }
 
 function renderWizardBuilder() {
@@ -493,6 +495,27 @@ function renderWizardBuilder() {
   renderWizardNodeEditor();
   renderWizardEdgeEditor();
   updateWizardConnectModeButton();
+}
+
+async function loadWizardConnections(nodeId) {
+  const edgeList = document.getElementById('wizard-edge-list');
+  const countLabel = document.getElementById('wizard-connection-count');
+  if (!nodeId) {
+    state.wizard.selectedConnections = [];
+    countLabel.textContent = '0';
+    edgeList.innerHTML = '<p class="subtext">Select a node to manage connections.</p>';
+    return;
+  }
+
+  try {
+    const payload = await apiFetch(`/admin/wizard/edges?node_id=${nodeId}`);
+    state.wizard.selectedConnections = payload.edges || [];
+    renderExistingConnections();
+  } catch (error) {
+    state.wizard.selectedConnections = [];
+    countLabel.textContent = '0';
+    edgeList.innerHTML = `<p class="warning">${error.message}</p>`;
+  }
 }
 
 function renderWizardNodeList() {
@@ -557,8 +580,23 @@ function renderWizardEdgeEditor() {
     edgeList.innerHTML = '<p class="subtext">Select a node to edit connections.</p>';
     return;
   }
+  renderExistingConnections();
+}
 
-  const outgoing = state.wizard.edges.filter((edge) => edge.from_node_id === node.id);
+function renderExistingConnections() {
+  const edgeList = document.getElementById('wizard-edge-list');
+  const countLabel = document.getElementById('wizard-connection-count');
+  const currentNodeId = state.wizard.selectedNodeId;
+
+  if (!currentNodeId) {
+    countLabel.textContent = '0';
+    edgeList.innerHTML = '<p class="subtext">Select a node to manage connections.</p>';
+    return;
+  }
+
+  const outgoing = state.wizard.selectedConnections || [];
+  countLabel.textContent = `${outgoing.length}`;
+
   if (!outgoing.length) {
     edgeList.innerHTML = '<p class="subtext">No outgoing connections yet.</p>';
     return;
@@ -566,18 +604,30 @@ function renderWizardEdgeEditor() {
 
   edgeList.innerHTML = outgoing
     .map((edge) => {
-      const target = state.wizard.nodes.find((entry) => entry.id === edge.to_node_id);
+      const targetOptions = state.wizard.nodes
+        .filter((entry) => entry.id !== currentNodeId)
+        .map(
+          (entry) => `<option value="${entry.id}" ${entry.id === edge.to_node_id ? 'selected' : ''}>${escapeHtml(entry.title)} (#${entry.id})</option>`
+        )
+        .join('');
+
       return `
-      <div class="wizard-edge-pill">
-        <span>${escapeHtml(edge.label)} → ${escapeHtml(target?.title || `Node ${edge.to_node_id}`)}</span>
-        <button class="button secondary" type="button" data-delete-edge="${edge.id}">Delete</button>
-      </div>
-    `;
+        <div class="wizard-edge-pill wizard-edge-edit" data-edge-row="${edge.id}">
+          <input type="text" value="${escapeHtml(edge.label)}" data-edge-label="${edge.id}" />
+          <select data-edge-target="${edge.id}">${targetOptions}</select>
+          <button class="button primary" type="button" data-save-edge="${edge.id}">Save</button>
+          <button class="button secondary" type="button" data-delete-edge="${edge.id}">Delete</button>
+        </div>
+      `;
     })
     .join('');
 
+  document.querySelectorAll('[data-save-edge]').forEach((button) => {
+    button.addEventListener('click', () => updateWizardEdge(Number(button.dataset.saveEdge)));
+  });
+
   document.querySelectorAll('[data-delete-edge]').forEach((button) => {
-    button.addEventListener('click', () => deleteWizardEdge(Number(button.dataset.deleteEdge)));
+    button.addEventListener('click', () => deleteWizardEdge(Number(button.dataset.deleteEdge), true));
   });
 }
 
@@ -705,6 +755,7 @@ function handleWizardNodeClick(nodeId) {
 
   state.wizard.selectedNodeId = nodeId;
   renderWizardBuilder();
+  loadWizardConnections(nodeId);
 }
 
 function toggleWizardConnectMode() {
@@ -818,16 +869,44 @@ async function createWizardEdge(payload) {
 
     setFormMessage('wizard-edge-message', 'Connection created.', 'success');
     await loadWizardBuilder();
+    await loadWizardConnections(state.wizard.selectedNodeId);
   } catch (error) {
     setFormMessage('wizard-edge-message', error.message, 'warning');
   }
 }
 
-async function deleteWizardEdge(edgeId) {
+async function updateWizardEdge(edgeId) {
+  const labelInput = document.querySelector(`[data-edge-label="${edgeId}"]`);
+  const targetSelect = document.querySelector(`[data-edge-target="${edgeId}"]`);
+  const label = labelInput?.value?.trim();
+  const toNodeId = Number(targetSelect?.value);
+
+  try {
+    await apiFetch(`/admin/wizard/edge/${edgeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, to_node_id: toNodeId })
+    });
+
+    setFormMessage('wizard-edge-message', 'Connection updated.', 'success');
+    await loadWizardBuilder();
+    await loadWizardConnections(state.wizard.selectedNodeId);
+  } catch (error) {
+    setFormMessage('wizard-edge-message', error.message, 'warning');
+  }
+}
+
+async function deleteWizardEdge(edgeId, confirmDelete = false) {
+  if (confirmDelete) {
+    const ok = window.confirm('Are you sure you want to delete this connection?');
+    if (!ok) return;
+  }
+
   try {
     await apiFetch(`/admin/wizard/edge/${edgeId}`, { method: 'DELETE' });
     setFormMessage('wizard-edge-message', 'Connection deleted.', 'success');
     await loadWizardBuilder();
+    await loadWizardConnections(state.wizard.selectedNodeId);
   } catch (error) {
     setFormMessage('wizard-edge-message', error.message, 'warning');
   }

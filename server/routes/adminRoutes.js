@@ -19,7 +19,8 @@ const {
   deleteWizardNode,
   listWizardEdges,
   createWizardEdge,
-  deleteWizardEdge
+  deleteWizardEdge,
+  updateWizardEdge
 } = require('../controllers/adminController');
 const { listAllOrders, updateOrderStatus, createAdminOrderNote } = require('../controllers/orderController');
 
@@ -69,6 +70,7 @@ router.put('/wizard/node/:id', updateWizardNode);
 router.delete('/wizard/node/:id', deleteWizardNode);
 router.get('/wizard/edges', listWizardEdges);
 router.post('/wizard/edge', createWizardEdge);
+router.put('/wizard/edge/:id', updateWizardEdge);
 router.delete('/wizard/edge/:id', deleteWizardEdge);
 
 module.exports = router;

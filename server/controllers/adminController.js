@@ -232,12 +232,17 @@ async function listWizardNodes(_req, res) {
 
 async function listWizardEdges(_req, res) {
   try {
+    const nodeId = Number(_req.query?.node_id);
+    const hasNodeFilter = Number.isInteger(nodeId) && nodeId > 0;
     const result = await query(
       `
       SELECT id, from_node_id, to_node_id, label, created_at
       FROM wizard_edges
+      ${hasNodeFilter ? 'WHERE from_node_id = $1' : ''}
       ORDER BY from_node_id ASC, id ASC;
       `
+      ,
+      hasNodeFilter ? [nodeId] : []
     );
 
     return res.json({ success: true, edges: result.rows });
@@ -451,6 +456,61 @@ async function deleteWizardEdge(req, res) {
   }
 }
 
+async function updateWizardEdge(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const label = req.body?.label?.toString().trim();
+    const toNodeId = Number(req.body?.to_node_id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid edge id.' });
+    }
+
+    if (!requiredString(label) || !Number.isInteger(toNodeId) || toNodeId <= 0) {
+      return res.status(400).json({ success: false, error: 'label and valid to_node_id are required.' });
+    }
+
+    const edgeResult = await query('SELECT id, from_node_id FROM wizard_edges WHERE id = $1;', [id]);
+    if (!edgeResult.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Wizard edge not found.' });
+    }
+
+    const fromNodeId = edgeResult.rows[0].from_node_id;
+    if (fromNodeId === toNodeId) {
+      return res.status(400).json({ success: false, error: 'A node cannot connect to itself.' });
+    }
+
+    const nodeCheck = await query('SELECT id FROM wizard_nodes WHERE id = ANY($1::int[]);', [[fromNodeId, toNodeId]]);
+    if (nodeCheck.rowCount !== 2) {
+      return res.status(400).json({ success: false, error: 'Both source and target nodes must exist.' });
+    }
+
+    const hasCycle = await hasPathBetweenNodes(toNodeId, fromNodeId);
+    if (hasCycle) {
+      return res.status(400).json({ success: false, error: 'Connection creates a loop. Please choose another target.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE wizard_edges
+      SET label = $2,
+          to_node_id = $3
+      WHERE id = $1
+      RETURNING id, from_node_id, to_node_id, label, created_at;
+      `,
+      [id, label, toNodeId]
+    );
+
+    return res.json({ success: true, edge: result.rows[0] });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ success: false, error: 'This choice label already exists for the selected source node.' });
+    }
+    console.error('[PUT /admin/wizard/edge/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update wizard edge.' });
+  }
+}
+
 module.exports = {
   createProduct,
   updateProduct,
@@ -466,5 +526,6 @@ module.exports = {
   deleteWizardNode,
   listWizardEdges,
   createWizardEdge,
-  deleteWizardEdge
+  deleteWizardEdge,
+  updateWizardEdge
 };

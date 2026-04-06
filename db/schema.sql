@@ -151,8 +151,12 @@ CREATE TABLE IF NOT EXISTS wizard_nodes (
   message TEXT NOT NULL DEFAULT '',
   category TEXT,
   needs_technician BOOLEAN NOT NULL DEFAULT FALSE,
+  recommended_items JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE wizard_nodes
+ADD COLUMN IF NOT EXISTS recommended_items JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS wizard_edges (
   id SERIAL PRIMARY KEY,

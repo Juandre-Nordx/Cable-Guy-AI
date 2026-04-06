@@ -66,7 +66,7 @@ async function wizardTree(_req, res) {
     const [nodesResult, edgesResult] = await Promise.all([
       query(
         `
-        SELECT id, title, type, message, category, needs_technician
+        SELECT id, title, type, message, category, needs_technician, recommended_items
         FROM wizard_nodes
         ORDER BY id ASC;
         `
@@ -90,10 +90,60 @@ async function wizardTree(_req, res) {
       });
     }
 
+    const allNodes = nodesResult.rows;
+    const recommendedByType = allNodes.reduce(
+      (acc, node) => {
+        const items = Array.isArray(node.recommended_items) ? node.recommended_items : [];
+        for (const item of items) {
+          if (!item || !Number.isInteger(Number(item.id))) continue;
+          if (item.type === 'product') acc.products.add(Number(item.id));
+          if (item.type === 'kit') acc.kits.add(Number(item.id));
+          if (item.type === 'service') acc.services.add(Number(item.id));
+        }
+        return acc;
+      },
+      { products: new Set(), kits: new Set(), services: new Set() }
+    );
+
+    const [productsResult, kitsResult, servicesResult] = await Promise.all([
+      recommendedByType.products.size
+        ? query('SELECT id, name, price, image_url, category FROM products WHERE id = ANY($1::int[]);', [[...recommendedByType.products]])
+        : { rows: [] },
+      recommendedByType.kits.size
+        ? query('SELECT id, name, price, image_url, category FROM kits WHERE id = ANY($1::int[]);', [[...recommendedByType.kits]])
+        : { rows: [] },
+      recommendedByType.services.size
+        ? query('SELECT id, name, price, NULL::text AS image_url, NULL::text AS category FROM services WHERE id = ANY($1::int[]);', [[...recommendedByType.services]])
+        : { rows: [] }
+    ]);
+
+    const productMap = new Map(productsResult.rows.map((item) => [item.id, item]));
+    const kitMap = new Map(kitsResult.rows.map((item) => [item.id, item]));
+    const serviceMap = new Map(servicesResult.rows.map((item) => [item.id, item]));
+
+    const nodes = allNodes.map((node) => {
+      const recommendedItems = (Array.isArray(node.recommended_items) ? node.recommended_items : [])
+        .map((item) => {
+          const normalizedId = Number(item?.id);
+          if (!Number.isInteger(normalizedId) || normalizedId <= 0) return null;
+          if (item.type === 'product') return { type: 'product', ...productMap.get(normalizedId) };
+          if (item.type === 'kit') return { type: 'kit', ...kitMap.get(normalizedId) };
+          if (item.type === 'service') return { type: 'service', ...serviceMap.get(normalizedId) };
+          return null;
+        })
+        .filter((item) => item && item.id);
+
+      return {
+        ...node,
+        recommended_items: recommendedItems,
+        recommendedItems
+      };
+    });
+
     return res.json({
       success: true,
       rootNodeId: rootNodes[0].id,
-      nodes: nodesResult.rows,
+      nodes,
       edges: edgesResult.rows
     });
   } catch (error) {

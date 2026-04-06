@@ -76,12 +76,12 @@ async function loadOrders() {
           <article class="card">
             <p><strong>Order #${order.id}</strong></p>
             <p>Kit: ${order.kit_name || 'Unknown'} (${order.kit_category || '-'})</p>
-            <p>Status: <strong>${order.status}</strong></p>
+            <p>Status: <strong>${order.status === 'done' ? 'Order Completed' : order.status}</strong></p>
             <p class="subtext">Placed: ${new Date(order.created_at).toLocaleString()}</p>
             <div id="order-notes-${order.id}" class="order-notes-feed subtext">Loading notes...</div>
             <form class="order-note-form" data-user-note-form="${order.id}">
               <textarea name="message" rows="2" placeholder="Reply to admin"></textarea>
-              <button class="button secondary" type="submit">Send</button>
+              <button class="button secondary" type="submit" ${order.status === 'done' ? 'disabled' : ''}>Send</button>
             </form>
           </article>
         `
@@ -94,6 +94,10 @@ async function loadOrders() {
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const orderId = form.dataset.userNoteForm;
+        const order = payload.orders.find((entry) => String(entry.id) === String(orderId));
+        if (order?.status === 'done') {
+          return;
+        }
         const message = form.querySelector('textarea[name="message"]')?.value?.trim();
         if (!message) return;
 

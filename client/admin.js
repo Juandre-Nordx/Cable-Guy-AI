@@ -48,6 +48,7 @@ function bindLayoutEvents() {
   document.getElementById('refresh-wizard').addEventListener('click', loadWizardBuilder);
   document.getElementById('wizard-add-node').addEventListener('click', createWizardNodeDraft);
   document.getElementById('wizard-add-connection').addEventListener('click', handleAddConnection);
+  document.getElementById('wizard-node-add-connection').addEventListener('click', handleAddNodeConnection);
   document.getElementById('wizard-connection-filter').addEventListener('change', handleConnectionFilterChange);
   document.querySelectorAll('[data-wizard-tab]').forEach((tab) => tab.addEventListener('click', () => activateWizardTab(tab.dataset.wizardTab)));
 }
@@ -60,6 +61,9 @@ function bindFormEvents() {
   document.getElementById('wizard-node-form').addEventListener('submit', submitWizardNode);
   document.getElementById('wizard-delete-node').addEventListener('click', deleteWizardNodeBySelection);
   document.querySelector('#wizard-node-form select[name="type"]').addEventListener('change', toggleWizardResultFields);
+  document.getElementById('product-cancel-edit').addEventListener('click', () => resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit'));
+  document.getElementById('kit-cancel-edit').addEventListener('click', () => resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit'));
+  document.getElementById('service-cancel-edit').addEventListener('click', () => resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit'));
 }
 
 async function bootAdmin() {
@@ -165,14 +169,16 @@ function renderOrdersTable() {
         <td>${order.customer_name || order.customer_email || '-'}</td>
         <td>${order.kit_name || '-'}</td>
         <td>
-          <select data-order-id="${order.id}">
+          <select data-order-id="${order.id}" ${order.status === 'done' ? 'disabled' : ''}>
             ${ORDER_STATUSES.map((status) => `<option value="${status}" ${order.status === status ? 'selected' : ''}>${status}</option>`).join('')}
           </select>
         </td>
         <td>${new Date(order.created_at).toLocaleString()}</td>
         <td>
           <div class="admin-order-actions">
-            <button class="button secondary" data-update-order="${order.id}">Update</button>
+            <button class="button secondary" data-update-order="${order.id}" ${order.status === 'done' ? 'disabled' : ''}>
+              ${order.status === 'done' ? 'Order Completed' : 'Update'}
+            </button>
             <button class="button secondary" data-toggle-notes="${order.id}">Notes</button>
           </div>
         </td>
@@ -288,6 +294,7 @@ async function submitProduct(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
+  const editId = Number(formData.get('id') || 0);
 
   const image = formData.get('image');
   let imageUrl = '';
@@ -307,14 +314,14 @@ async function submitProduct(event) {
       image_url: imageUrl || null
     };
 
-    await apiFetch('/admin/product', {
-      method: 'POST',
+    await apiFetch(editId ? `/admin/product/${editId}` : '/admin/product', {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productPayload)
     });
 
-    setFormMessage('product-message', 'Product added successfully.', 'success');
-    form.reset();
+    setFormMessage('product-message', editId ? 'Product updated successfully.' : 'Product added successfully.', 'success');
+    resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit');
     await loadProducts();
     await loadDashboard();
   } catch (error) {
@@ -327,6 +334,7 @@ async function submitKit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const data = new FormData(form);
+  const editId = Number(data.get('id') || 0);
 
   let imageUrl = '';
 
@@ -348,14 +356,14 @@ async function submitKit(event) {
       video_url: data.get('video_url')?.toString().trim() || null
     };
 
-    await apiFetch('/admin/kit', {
-      method: 'POST',
+    await apiFetch(editId ? `/admin/kit/${editId}` : '/admin/kit', {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    setFormMessage('kit-message', 'Kit added successfully.', 'success');
-    form.reset();
+    setFormMessage('kit-message', editId ? 'Kit updated successfully.' : 'Kit added successfully.', 'success');
+    resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit');
     await loadKits();
     await loadDashboard();
   } catch (error) {
@@ -368,6 +376,7 @@ async function submitService(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const data = new FormData(form);
+  const editId = Number(data.get('id') || 0);
 
   const payload = {
     name: data.get('name')?.toString().trim(),
@@ -376,14 +385,14 @@ async function submitService(event) {
   };
 
   try {
-    await apiFetch('/admin/service', {
-      method: 'POST',
+    await apiFetch(editId ? `/admin/service/${editId}` : '/admin/service', {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    setFormMessage('service-message', 'Service added successfully.', 'success');
-    form.reset();
+    setFormMessage('service-message', editId ? 'Service updated successfully.' : 'Service added successfully.', 'success');
+    resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit');
     await loadServices();
   } catch (error) {
     console.error('[Admin] service submit failed:', error.message);
@@ -414,6 +423,9 @@ async function loadProducts() {
   const payload = await fetch('/products').then((response) => response.json());
   state.products = payload.products || [];
   renderProductsTable();
+  if (state.wizard.nodes.length) {
+    populateRecommendedItemsField(state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId) || null);
+  }
 }
 
 function renderProductsTable() {
@@ -426,20 +438,36 @@ function renderProductsTable() {
         <td>${product.category}</td>
         <td>${formatPrice(product.price, product.currency)}</td>
         <td>${product.image_url ? `<a href="${product.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" type="button" data-edit-product="${product.id}">Edit</button>
+            <button class="button secondary" type="button" data-delete-product="${product.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('products-table-wrap').innerHTML = state.products.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Image</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No products found.</p>';
+
+  document.querySelectorAll('[data-edit-product]').forEach((button) => {
+    button.addEventListener('click', () => startEditProduct(Number(button.dataset.editProduct)));
+  });
+  document.querySelectorAll('[data-delete-product]').forEach((button) => {
+    button.addEventListener('click', () => deleteProduct(Number(button.dataset.deleteProduct)));
+  });
 }
 
 async function loadKits() {
   const payload = await fetch('/kits').then((response) => response.json());
   state.kits = payload.kits || [];
   renderKitsTable();
+  if (state.wizard.nodes.length) {
+    populateRecommendedItemsField(state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId) || null);
+  }
 }
 
 function renderKitsTable() {
@@ -456,20 +484,36 @@ function renderKitsTable() {
         <td>${kit.instructions ? 'Included' : '-'}</td>
         <td>${kit.image_url ? `<a href="${kit.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
         <td>${kit.video_url ? `<a href="${kit.video_url}" target="_blank" rel="noopener noreferrer">Video</a>` : '-'}</td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" type="button" data-edit-kit="${kit.id}">Edit</button>
+            <button class="button secondary" type="button" data-delete-kit="${kit.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('kits-table-wrap').innerHTML = state.kits.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No kits found.</p>';
+
+  document.querySelectorAll('[data-edit-kit]').forEach((button) => {
+    button.addEventListener('click', () => startEditKit(Number(button.dataset.editKit)));
+  });
+  document.querySelectorAll('[data-delete-kit]').forEach((button) => {
+    button.addEventListener('click', () => deleteKit(Number(button.dataset.deleteKit)));
+  });
 }
 
 async function loadServices() {
   const payload = await fetch('/services').then((response) => response.json());
   state.services = payload.services || [];
   renderServicesTable();
+  if (state.wizard.nodes.length) {
+    populateRecommendedItemsField(state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId) || null);
+  }
 }
 
 async function loadSettings() {
@@ -511,14 +555,118 @@ function renderServicesTable() {
         <td>${service.name}</td>
         <td>${service.description}</td>
         <td>$${Number(service.price).toFixed(2)}</td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" type="button" data-edit-service="${service.id}">Edit</button>
+            <button class="button secondary" type="button" data-delete-service="${service.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('services-table-wrap').innerHTML = state.services.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No services found.</p>';
+
+  document.querySelectorAll('[data-edit-service]').forEach((button) => {
+    button.addEventListener('click', () => startEditService(Number(button.dataset.editService)));
+  });
+  document.querySelectorAll('[data-delete-service]').forEach((button) => {
+    button.addEventListener('click', () => deleteService(Number(button.dataset.deleteService)));
+  });
+}
+
+function resetEntityForm(formId, saveButtonId, defaultLabel, cancelButtonId) {
+  const form = document.getElementById(formId);
+  form?.reset();
+  if (form?.elements?.id) {
+    form.elements.id.value = '';
+  }
+  const saveButton = document.getElementById(saveButtonId);
+  if (saveButton) saveButton.textContent = defaultLabel;
+  const cancelButton = document.getElementById(cancelButtonId);
+  cancelButton?.classList.add('hidden');
+}
+
+function startEditProduct(id) {
+  const product = state.products.find((entry) => entry.id === id);
+  const form = document.getElementById('product-form');
+  if (!product || !form) return;
+  form.elements.id.value = String(product.id);
+  form.elements.name.value = product.name || '';
+  form.elements.category.value = product.category || '';
+  form.elements.price.value = product.price ?? '';
+  form.elements.cost.value = product.cost ?? '';
+  form.elements.description.value = product.description || '';
+  document.getElementById('product-save-button').textContent = 'Update Product';
+  document.getElementById('product-cancel-edit').classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteProduct(id) {
+  if (!window.confirm('Are you sure you want to delete this product?')) return;
+  try {
+    await apiFetch(`/admin/product/${id}`, { method: 'DELETE' });
+    setFormMessage('product-message', `Product #${id} deleted successfully.`, 'success');
+    await Promise.all([loadProducts(), loadDashboard()]);
+  } catch (error) {
+    setFormMessage('product-message', error.message, 'warning');
+  }
+}
+
+function startEditKit(id) {
+  const kit = state.kits.find((entry) => entry.id === id);
+  const form = document.getElementById('kit-form');
+  if (!kit || !form) return;
+  form.elements.id.value = String(kit.id);
+  form.elements.name.value = kit.name || '';
+  form.elements.category.value = kit.category || 'home';
+  form.elements.price.value = kit.price ?? '';
+  form.elements.difficulty.value = kit.difficulty || 'easy';
+  form.elements.requires_technician.checked = Boolean(kit.requires_technician);
+  form.elements.description.value = kit.description || '';
+  form.elements.instructions.value = kit.instructions || '';
+  form.elements.video_url.value = kit.video_url || '';
+  document.getElementById('kit-save-button').textContent = 'Update Kit';
+  document.getElementById('kit-cancel-edit').classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteKit(id) {
+  if (!window.confirm('Are you sure you want to delete this kit?')) return;
+  try {
+    await apiFetch(`/admin/kit/${id}`, { method: 'DELETE' });
+    setFormMessage('kit-message', `Kit #${id} deleted successfully.`, 'success');
+    await Promise.all([loadKits(), loadDashboard()]);
+  } catch (error) {
+    setFormMessage('kit-message', error.message, 'warning');
+  }
+}
+
+function startEditService(id) {
+  const service = state.services.find((entry) => entry.id === id);
+  const form = document.getElementById('service-form');
+  if (!service || !form) return;
+  form.elements.id.value = String(service.id);
+  form.elements.name.value = service.name || '';
+  form.elements.description.value = service.description || '';
+  form.elements.price.value = service.price ?? '';
+  document.getElementById('service-save-button').textContent = 'Update Service';
+  document.getElementById('service-cancel-edit').classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteService(id) {
+  if (!window.confirm('Are you sure you want to delete this service?')) return;
+  try {
+    await apiFetch(`/admin/service/${id}`, { method: 'DELETE' });
+    setFormMessage('service-message', `Service #${id} deleted successfully.`, 'success');
+    await loadServices();
+  } catch (error) {
+    setFormMessage('service-message', error.message, 'warning');
+  }
 }
 
 async function loadWizardBuilder() {
@@ -597,6 +745,8 @@ function renderNodeEditor() {
     form.reset();
     form.elements.id.value = '';
     messageLabel.classList.remove('hidden');
+    populateRecommendedItemsField(null);
+    renderNodeConnectionsEditor();
     return;
   }
 
@@ -606,7 +756,25 @@ function renderNodeEditor() {
   form.elements.message.value = node.message || '';
   form.elements.category.value = node.category || '';
   form.elements.needs_technician.checked = Boolean(node.needs_technician);
+  populateRecommendedItemsField(node);
   toggleWizardResultFields();
+  renderNodeConnectionsEditor();
+}
+
+function populateRecommendedItemsField(node) {
+  const select = document.getElementById('wizard-recommended-items');
+  if (!select) return;
+
+  const options = [
+    ...state.products.map((item) => ({ value: `product:${item.id}`, label: `Product: ${item.name} (#${item.id})` })),
+    ...state.kits.map((item) => ({ value: `kit:${item.id}`, label: `Kit: ${item.name} (#${item.id})` })),
+    ...state.services.map((item) => ({ value: `service:${item.id}`, label: `Service: ${item.name} (#${item.id})` }))
+  ];
+  const selected = new Set((node?.recommended_items || []).map((item) => `${item.type}:${item.id}`));
+
+  select.innerHTML = options
+    .map((option) => `<option value="${option.value}" ${selected.has(option.value) ? 'selected' : ''}>${escapeHtml(option.label)}</option>`)
+    .join('');
 }
 
 function renderConnections() {
@@ -676,6 +844,78 @@ function renderConnectionsTable() {
   });
   document.querySelectorAll('[data-delete-edge]').forEach((button) => {
     button.addEventListener('click', () => deleteWizardEdge(Number(button.dataset.deleteEdge), true));
+  });
+}
+
+function renderNodeConnectionsEditor() {
+  const container = document.getElementById('wizard-node-connections-list');
+  const targetSelect = document.getElementById('wizard-node-connection-target');
+  const nodeId = state.wizard.selectedNodeId;
+  if (!container) return;
+
+  if (!nodeId) {
+    if (targetSelect) targetSelect.innerHTML = '';
+    container.innerHTML = '<p class="subtext">Select a node to edit its outgoing connections.</p>';
+    return;
+  }
+
+  if (targetSelect) {
+    const targetOptions = state.wizard.nodes
+      .filter((node) => node.id !== nodeId)
+      .map((node) => `<option value="${node.id}">${escapeHtml(node.title)} (#${node.id})</option>`)
+      .join('');
+    targetSelect.innerHTML = targetOptions;
+  }
+
+  const edges = state.wizard.edges.filter((edge) => edge.from_node_id === nodeId);
+  if (!edges.length) {
+    container.innerHTML = '<p class="subtext">No outgoing connections yet.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Label</th><th>Target node</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        ${edges
+          .map((edge) => {
+            const targets = state.wizard.nodes
+              .filter((node) => node.id !== nodeId)
+              .map((node) => `<option value="${node.id}" ${node.id === edge.to_node_id ? 'selected' : ''}>${escapeHtml(node.title)} (#${node.id})</option>`)
+              .join('');
+            return `
+              <tr>
+                <td><input type="text" data-node-edge-label="${edge.id}" value="${escapeHtml(edge.label)}" /></td>
+                <td><select data-node-edge-target="${edge.id}">${targets}</select></td>
+                <td>
+                  <div class="admin-order-actions">
+                    <button class="button primary" type="button" data-node-edge-save="${edge.id}">Save</button>
+                    <button class="button secondary" type="button" data-node-edge-delete="${edge.id}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join('')}
+      </tbody>
+    </table>
+  `;
+
+  document.querySelectorAll('[data-node-edge-save]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const edgeId = Number(button.dataset.nodeEdgeSave);
+      const label = document.querySelector(`[data-node-edge-label="${edgeId}"]`)?.value?.trim();
+      const toNodeId = Number(document.querySelector(`[data-node-edge-target="${edgeId}"]`)?.value);
+      await updateWizardEdge(edgeId, { label, to_node_id: toNodeId }, 'wizard-node-connections-message');
+    });
+  });
+
+  document.querySelectorAll('[data-node-edge-delete]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      await deleteWizardEdge(Number(button.dataset.nodeEdgeDelete), true, 'wizard-node-connections-message');
+    });
   });
 }
 
@@ -795,6 +1035,7 @@ function toggleWizardResultFields() {
   if (!form) return;
   const isResult = form.elements.type.value === 'result';
   form.querySelector('[data-role="wizard-message-field"]')?.classList.toggle('hidden', !isResult);
+  form.querySelector('[data-role="wizard-recommended-field"]')?.classList.toggle('hidden', !isResult);
 }
 
 function createWizardNodeDraft() {
@@ -808,6 +1049,19 @@ function createWizardNodeDraft() {
   renderWizardBuilder();
 }
 
+function getRecommendedItemsFromForm(form) {
+  const select = form.elements.recommended_items;
+  if (!select) return [];
+
+  return Array.from(select.selectedOptions)
+    .map((option) => option.value)
+    .map((value) => {
+      const [type, idText] = value.split(':');
+      return { type, id: Number(idText) };
+    })
+    .filter((entry) => Number.isInteger(entry.id) && entry.id > 0);
+}
+
 async function submitWizardNode(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -817,7 +1071,8 @@ async function submitWizardNode(event) {
     type: form.elements.type.value,
     message: form.elements.message.value.trim(),
     category: form.elements.category.value.trim() || null,
-    needs_technician: form.elements.needs_technician.checked
+    needs_technician: form.elements.needs_technician.checked,
+    recommended_items: getRecommendedItemsFromForm(form)
   };
 
   try {
@@ -887,7 +1142,34 @@ async function handleAddConnection() {
   await createWizardEdge({ from_node_id: fromNodeId, to_node_id: defaultTarget, label: label.trim() });
 }
 
-async function createWizardEdge(payload) {
+async function handleAddNodeConnection() {
+  const fromNodeId = state.wizard.selectedNodeId;
+  if (!fromNodeId) {
+    setFormMessage('wizard-node-connections-message', 'Select a node before adding a connection.', 'warning');
+    return;
+  }
+
+  const label = document.getElementById('wizard-node-connection-label')?.value?.trim();
+  const toNodeId = Number(document.getElementById('wizard-node-connection-target')?.value);
+  if (!label) {
+    setFormMessage('wizard-node-connections-message', 'Connection label is required.', 'warning');
+    return;
+  }
+
+  if (!Number.isInteger(toNodeId) || toNodeId <= 0) {
+    setFormMessage('wizard-node-connections-message', 'Create another node first.', 'warning');
+    return;
+  }
+
+  await createWizardEdge(
+    { from_node_id: fromNodeId, to_node_id: toNodeId, label },
+    'wizard-node-connections-message'
+  );
+  const labelField = document.getElementById('wizard-node-connection-label');
+  if (labelField) labelField.value = '';
+}
+
+async function createWizardEdge(payload, messageFieldId = 'wizard-edge-message') {
   try {
     await apiFetch('/admin/wizard/edge', {
       method: 'POST',
@@ -895,18 +1177,18 @@ async function createWizardEdge(payload) {
       body: JSON.stringify(payload)
     });
 
-    setFormMessage('wizard-edge-message', 'Connection created.', 'success');
+    setFormMessage(messageFieldId, 'Connection created.', 'success');
     await loadWizardBuilder();
   } catch (error) {
-    setFormMessage('wizard-edge-message', error.message, 'warning');
+    setFormMessage(messageFieldId, error.message, 'warning');
   }
 }
 
-async function updateWizardEdge(edgeId) {
+async function updateWizardEdge(edgeId, overridePayload = null, messageFieldId = 'wizard-edge-message') {
   const labelInput = document.querySelector(`[data-edge-label="${edgeId}"]`);
   const targetSelect = document.querySelector(`[data-edge-target="${edgeId}"]`);
-  const label = labelInput?.value?.trim();
-  const toNodeId = Number(targetSelect?.value);
+  const label = overridePayload?.label ?? labelInput?.value?.trim();
+  const toNodeId = overridePayload?.to_node_id ?? Number(targetSelect?.value);
   state.wizard.selectedEdgeId = edgeId;
 
   try {
@@ -916,14 +1198,14 @@ async function updateWizardEdge(edgeId) {
       body: JSON.stringify({ label, to_node_id: toNodeId })
     });
 
-    setFormMessage('wizard-edge-message', 'Connection updated.', 'success');
+    setFormMessage(messageFieldId, 'Connection updated.', 'success');
     await loadWizardBuilder();
   } catch (error) {
-    setFormMessage('wizard-edge-message', error.message, 'warning');
+    setFormMessage(messageFieldId, error.message, 'warning');
   }
 }
 
-async function deleteWizardEdge(edgeId, confirmDelete = false) {
+async function deleteWizardEdge(edgeId, confirmDelete = false, messageFieldId = 'wizard-edge-message') {
   if (confirmDelete) {
     const ok = window.confirm('Are you sure you want to delete this connection?');
     if (!ok) return;
@@ -934,10 +1216,10 @@ async function deleteWizardEdge(edgeId, confirmDelete = false) {
     if (state.wizard.selectedEdgeId === edgeId) {
       state.wizard.selectedEdgeId = null;
     }
-    setFormMessage('wizard-edge-message', 'Connection deleted.', 'success');
+    setFormMessage(messageFieldId, 'Connection deleted.', 'success');
     await loadWizardBuilder();
   } catch (error) {
-    setFormMessage('wizard-edge-message', error.message, 'warning');
+    setFormMessage(messageFieldId, error.message, 'warning');
   }
 }
 

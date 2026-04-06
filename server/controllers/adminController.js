@@ -5,6 +5,7 @@ const { ORDER_STATUSES } = require('./orderController');
 const KIT_CATEGORIES = ['home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart'];
 const WIZARD_NODE_TYPES = ['question', 'result'];
 const ALLOWED_CURRENCIES = ['ZAR', 'USD', 'EUR'];
+const RECOMMENDED_ITEM_TYPES = ['product', 'kit', 'service'];
 
 async function createProduct(req, res) {
   try {
@@ -133,6 +134,71 @@ async function createKit(req, res) {
   }
 }
 
+async function updateKit(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const {
+      name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url
+    } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid kit id.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE kits
+      SET name = COALESCE($2, name),
+          category = COALESCE($3, category),
+          price = COALESCE($4, price),
+          difficulty = COALESCE($5, difficulty),
+          requires_technician = COALESCE($6, requires_technician),
+          description = COALESCE($7, description),
+          instructions = COALESCE($8, instructions),
+          image_url = COALESCE($9, image_url),
+          video_url = COALESCE($10, video_url)
+      WHERE id = $1
+      RETURNING *;
+      `,
+      [
+        id,
+        requiredString(name) ? name.trim() : null,
+        validateEnum(category, KIT_CATEGORIES) ? category : null,
+        validateNumber(price) ? price : null,
+        requiredString(difficulty) ? difficulty.trim() : null,
+        typeof requires_technician === 'boolean' ? requires_technician : null,
+        requiredString(description) ? description.trim() : null,
+        requiredString(instructions) ? instructions.trim() : null,
+        requiredString(image_url) ? image_url.trim() : null,
+        requiredString(video_url) ? video_url.trim() : null
+      ]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Kit not found.' });
+    }
+
+    return res.json({ success: true, kit: result.rows[0] });
+  } catch (error) {
+    console.error('[PUT /admin/kit/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update kit.' });
+  }
+}
+
+async function deleteKit(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const result = await query('DELETE FROM kits WHERE id = $1 RETURNING id;', [id]);
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Kit not found.' });
+    }
+    return res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('[DELETE /admin/kit/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete kit.' });
+  }
+}
+
 
 async function createService(req, res) {
   try {
@@ -155,6 +221,57 @@ async function createService(req, res) {
   } catch (error) {
     console.error('[POST /admin/service] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to create service.' });
+  }
+}
+
+async function updateService(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const { name, description, price } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid service id.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE services
+      SET name = COALESCE($2, name),
+          description = COALESCE($3, description),
+          price = COALESCE($4, price)
+      WHERE id = $1
+      RETURNING *;
+      `,
+      [
+        id,
+        requiredString(name) ? name.trim() : null,
+        requiredString(description) ? description.trim() : null,
+        validateNumber(price) ? price : null
+      ]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Service not found.' });
+    }
+
+    return res.json({ success: true, service: result.rows[0] });
+  } catch (error) {
+    console.error('[PUT /admin/service/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update service.' });
+  }
+}
+
+async function deleteService(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const result = await query('DELETE FROM services WHERE id = $1 RETURNING id;', [id]);
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Service not found.' });
+    }
+    return res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('[DELETE /admin/service/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete service.' });
   }
 }
 
@@ -266,7 +383,7 @@ async function listWizardNodes(_req, res) {
   try {
     const result = await query(
       `
-      SELECT id, title, type, message, category, needs_technician, created_at
+      SELECT id, title, type, message, category, needs_technician, recommended_items, created_at
       FROM wizard_nodes
       ORDER BY id ASC;
       `
@@ -307,7 +424,51 @@ function sanitizeWizardNodeInput(payload = {}) {
   const message = requiredString(payload.message) ? payload.message.trim() : '';
   const category = requiredString(payload.category) ? payload.category.trim() : null;
   const needsTechnician = Boolean(payload.needs_technician);
-  return { title, type, message, category, needsTechnician };
+  const recommendedItems = sanitizeRecommendedItems(payload.recommended_items);
+  return { title, type, message, category, needsTechnician, recommendedItems };
+}
+
+function sanitizeRecommendedItems(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .map((item) => {
+      const type = item?.type?.toString().trim().toLowerCase();
+      const id = Number(item?.id);
+      if (!validateEnum(type, RECOMMENDED_ITEM_TYPES) || !Number.isInteger(id) || id <= 0) {
+        return null;
+      }
+      return { type, id };
+    })
+    .filter(Boolean)
+    .filter((item, index, source) => source.findIndex((entry) => entry.type === item.type && entry.id === item.id) === index);
+}
+
+async function validateRecommendedItemsExist(items = []) {
+  const idsByType = {
+    product: items.filter((item) => item.type === 'product').map((item) => item.id),
+    kit: items.filter((item) => item.type === 'kit').map((item) => item.id),
+    service: items.filter((item) => item.type === 'service').map((item) => item.id)
+  };
+
+  const [productsResult, kitsResult, servicesResult] = await Promise.all([
+    idsByType.product.length ? query('SELECT id FROM products WHERE id = ANY($1::int[]);', [idsByType.product]) : { rows: [] },
+    idsByType.kit.length ? query('SELECT id FROM kits WHERE id = ANY($1::int[]);', [idsByType.kit]) : { rows: [] },
+    idsByType.service.length ? query('SELECT id FROM services WHERE id = ANY($1::int[]);', [idsByType.service]) : { rows: [] }
+  ]);
+
+  const validProducts = new Set(productsResult.rows.map((row) => row.id));
+  const validKits = new Set(kitsResult.rows.map((row) => row.id));
+  const validServices = new Set(servicesResult.rows.map((row) => row.id));
+
+  const missing = items.find((item) => {
+    if (item.type === 'product') return !validProducts.has(item.id);
+    if (item.type === 'kit') return !validKits.has(item.id);
+    if (item.type === 'service') return !validServices.has(item.id);
+    return true;
+  });
+
+  return { isValid: !missing, missing };
 }
 
 async function countRootNodes() {
@@ -325,7 +486,7 @@ async function countRootNodes() {
 
 async function createWizardNode(req, res) {
   try {
-    const { title, type, message, category, needsTechnician } = sanitizeWizardNodeInput(req.body);
+    const { title, type, message, category, needsTechnician, recommendedItems } = sanitizeWizardNodeInput(req.body);
 
     if (!requiredString(title) || !validateEnum(type, WIZARD_NODE_TYPES)) {
       return res.status(400).json({ success: false, error: 'title and valid type are required.' });
@@ -335,13 +496,18 @@ async function createWizardNode(req, res) {
       return res.status(400).json({ success: false, error: 'message is required for result nodes.' });
     }
 
+    const check = await validateRecommendedItemsExist(recommendedItems);
+    if (!check.isValid) {
+      return res.status(400).json({ success: false, error: `Recommended ${check.missing.type} #${check.missing.id} does not exist.` });
+    }
+
     const result = await query(
       `
-      INSERT INTO wizard_nodes (title, type, message, category, needs_technician)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, title, type, message, category, needs_technician, created_at;
+      INSERT INTO wizard_nodes (title, type, message, category, needs_technician, recommended_items)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+      RETURNING id, title, type, message, category, needs_technician, recommended_items, created_at;
       `,
-      [title, type, type === 'result' ? message : '', category, needsTechnician]
+      [title, type, type === 'result' ? message : '', category, needsTechnician, JSON.stringify(type === 'result' ? recommendedItems : [])]
     );
 
     return res.status(201).json({ success: true, node: result.rows[0] });
@@ -354,7 +520,7 @@ async function createWizardNode(req, res) {
 async function updateWizardNode(req, res) {
   try {
     const id = Number(req.params.id);
-    const { title, type, message, category, needsTechnician } = sanitizeWizardNodeInput(req.body);
+    const { title, type, message, category, needsTechnician, recommendedItems } = sanitizeWizardNodeInput(req.body);
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid node id.' });
@@ -368,6 +534,11 @@ async function updateWizardNode(req, res) {
       return res.status(400).json({ success: false, error: 'message is required for result nodes.' });
     }
 
+    const check = await validateRecommendedItemsExist(recommendedItems);
+    if (!check.isValid) {
+      return res.status(400).json({ success: false, error: `Recommended ${check.missing.type} #${check.missing.id} does not exist.` });
+    }
+
     const result = await query(
       `
       UPDATE wizard_nodes
@@ -375,11 +546,12 @@ async function updateWizardNode(req, res) {
           type = $3,
           message = $4,
           category = $5,
-          needs_technician = $6
+          needs_technician = $6,
+          recommended_items = $7::jsonb
       WHERE id = $1
-      RETURNING id, title, type, message, category, needs_technician, created_at;
+      RETURNING id, title, type, message, category, needs_technician, recommended_items, created_at;
       `,
-      [id, title, type, type === 'result' ? message : '', category, needsTechnician]
+      [id, title, type, type === 'result' ? message : '', category, needsTechnician, JSON.stringify(type === 'result' ? recommendedItems : [])]
     );
 
     if (!result.rows[0]) {
@@ -565,7 +737,11 @@ module.exports = {
   updateProduct,
   deleteProduct,
   createKit,
+  updateKit,
+  deleteKit,
   createService,
+  updateService,
+  deleteService,
   listUsers,
   dashboard,
   getAdminSettings,

@@ -22,6 +22,7 @@ const wizardState = {
   nodesById: new Map(),
   outgoingByNodeId: new Map()
 };
+const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
 
 function scrollToBottom() {
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -79,12 +80,39 @@ function renderTechnicianPrompt(message = 'This issue may require onsite setup o
 
 function renderWizardResult(payload) {
   const viewKitLink = payload.category ? `/store.html?category=${encodeURIComponent(payload.category)}` : '/store.html';
+  const recommendedItems = Array.isArray(payload.recommendedItems) ? payload.recommendedItems : [];
+  const recommendedSection = recommendedItems.length
+    ? `
+      <section class="recommended-section">
+        <h4>Recommended for You</h4>
+        <div class="recommended-scroll">
+          ${recommendedItems
+            .map(
+              (item) => `
+                <article class="card recommended-item-card">
+                  ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" loading="lazy" />` : '<div class="recommended-image-placeholder">No Image</div>'}
+                  <h5>${item.name || `${item.type} #${item.id}`}</h5>
+                  <p class="subtext">${item.type}</p>
+                  <p><strong>Price:</strong> ${formatPrice(item.price, item.currency)}</p>
+                  <div class="kit-card-actions">
+                    <a class="button secondary" href="${buildStoreLink(item)}">View</a>
+                    <button class="button primary" type="button" data-buy-item="${encodeURIComponent(JSON.stringify({ type: item.type, id: item.id, category: item.category || '' }))}">Buy</button>
+                  </div>
+                </article>
+              `
+            )
+            .join('')}
+        </div>
+      </section>
+    `
+    : '';
 
   wizardResult.classList.remove('hidden');
   wizardResult.innerHTML = `
     <h3>Recommended Category: ${payload.category || 'General'}</h3>
     <p class="subtext">${payload.message}</p>
     ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : '<p class="success">✅ No onsite technician required.</p>'}
+    ${recommendedSection}
     <div class="kit-card-actions">
       <a class="button secondary" href="${viewKitLink}">Visit Store</a>
       <button id="book-teck" class="button primary" type="button">Book a teck</button>
@@ -95,6 +123,47 @@ function renderWizardResult(payload) {
     bookingSection.classList.remove('hidden');
     bookingSection.scrollIntoView({ behavior: 'smooth' });
   });
+
+  wizardResult.querySelectorAll('[data-buy-item]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const raw = button.getAttribute('data-buy-item');
+      if (!raw) return;
+      handleWizardBuy(raw);
+    });
+  });
+}
+
+function buildStoreLink(item) {
+  const params = new URLSearchParams();
+  if (item.type === 'product') params.set('product_id', item.id);
+  if (item.type === 'kit') params.set('kit_id', item.id);
+  if (item.type === 'service') params.set('service_id', item.id);
+  if (item.category) params.set('category', item.category);
+  const query = params.toString();
+  return `/store.html${query ? `?${query}` : ''}`;
+}
+
+function handleWizardBuy(rawItem) {
+  let item;
+  try {
+    item = JSON.parse(decodeURIComponent(rawItem));
+  } catch (_error) {
+    return;
+  }
+
+  if (!localStorage.getItem('token')) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  window.location.href = buildStoreLink(item);
+}
+
+function formatPrice(amount, currency = 'ZAR') {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return 'Contact us';
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  return `${symbol}${numericAmount.toFixed(2)}`;
 }
 
 function setWizardTree(payload) {
@@ -125,7 +194,8 @@ function renderCurrentWizardNode() {
     renderWizardResult({
       message: node.message || 'No recommendation message configured.',
       category: node.category || null,
-      needsTechnician: Boolean(node.needs_technician)
+      needsTechnician: Boolean(node.needs_technician),
+      recommendedItems: node.recommendedItems || node.recommended_items || []
     });
     return;
   }

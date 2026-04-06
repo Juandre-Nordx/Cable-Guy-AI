@@ -1,14 +1,12 @@
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
 const serviceGrid = document.getElementById('service-grid');
-const orderFlowModal = document.getElementById('order-flow-modal');
+const orderPopup = document.getElementById('orderPopup');
 const query = new URLSearchParams(window.location.search);
 const highlightedCategory = query.get('category');
 const highlightedProductId = Number(query.get('product_id') || 0);
 const highlightedKitId = Number(query.get('kit_id') || 0);
 const highlightedServiceId = Number(query.get('service_id') || 0);
-let showOrderPopup = false;
-let popupResolve = null;
 let isPlacingOrder = false;
 
 function escapeHtml(text = '') {
@@ -76,8 +74,8 @@ function renderKit(kit) {
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
     <p><strong>Price:</strong> ${formatCurrency(kit.price, kit.currency)}</p>
     <div class="kit-card-actions">
-      <button class="button secondary" type="button" data-toggle-details="${detailsId}">View Details</button>
-      <button class="button primary" type="button" data-kit-id="${kit.id}">Place Order</button>
+      <button class="button secondary view-details-btn" type="button" data-id="${kit.id}" data-toggle-details="${detailsId}">View Details</button>
+      <button class="button primary place-order-btn" type="button" data-id="${kit.id}" data-kit-name="${escapeHtml(kit.name)}">Place Order</button>
     </div>
     <section id="${detailsId}" class="kit-details hidden">
       ${kit.image_url ? `<img src="${kit.image_url}" alt="${kit.name}" class="kit-main-image" loading="lazy" />` : ''}
@@ -87,23 +85,6 @@ function renderKit(kit) {
       ${embedUrl ? `<div class="kit-video"><h4>Video</h4><iframe src="${embedUrl}" title="${kit.name} installation video" loading="lazy" allowfullscreen></iframe></div>` : ''}
     </section>
   `;
-
-  const buyButton = card.querySelector('[data-kit-id]');
-  buyButton?.addEventListener('click', async (event) => {
-    event.preventDefault();
-    console.log('Button clicked');
-    await withButtonLoading(buyButton, 'Loading...', () => placeOrder(kit.id, kit.name));
-  });
-
-  const detailsButton = card.querySelector('[data-toggle-details]');
-  detailsButton?.addEventListener('click', async (event) => {
-    event.preventDefault();
-    console.log('Button clicked');
-    const details = card.querySelector(`#${detailsId}`);
-    const isHidden = details?.classList.contains('hidden');
-    details?.classList.toggle('hidden', !isHidden);
-    detailsButton.textContent = isHidden ? 'Hide Details' : 'View Details';
-  });
 
   return card;
 }
@@ -169,20 +150,18 @@ function lockBodyScroll(shouldLock) {
   document.body.style.overflow = shouldLock ? 'hidden' : '';
 }
 
-function toggleOrderFlowModal() {
-  if (!orderFlowModal) return;
-  orderFlowModal.classList.toggle('hidden', !showOrderPopup);
-  orderFlowModal.classList.toggle('open', showOrderPopup);
-  lockBodyScroll(showOrderPopup);
+function showOrderPopup() {
+  if (!orderPopup) return;
+  orderPopup.classList.remove('hidden');
+  orderPopup.classList.add('open');
+  lockBodyScroll(true);
 }
 
-function closePopup(confirmed = false) {
-  showOrderPopup = false;
-  toggleOrderFlowModal();
-  if (popupResolve) {
-    popupResolve(confirmed);
-    popupResolve = null;
-  }
+function closeOrderPopup() {
+  if (!orderPopup) return;
+  orderPopup.classList.add('hidden');
+  orderPopup.classList.remove('open');
+  lockBodyScroll(false);
 }
 
 function highlightRequestedItems() {
@@ -199,18 +178,8 @@ function highlightRequestedItems() {
   first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function showOrderFlowModalAfterClick() {
-  if (!orderFlowModal) return Promise.resolve(true);
-  showOrderPopup = true;
-  toggleOrderFlowModal();
-
-  return new Promise((resolve) => {
-    popupResolve = resolve;
-  });
-}
-
 async function placeOrder(kitId, kitName) {
-  if (isPlacingOrder || showOrderPopup) return;
+  if (isPlacingOrder) return;
   const token = localStorage.getItem('token');
 
   if (!token) {
@@ -220,12 +189,6 @@ async function placeOrder(kitId, kitName) {
 
   try {
     isPlacingOrder = true;
-    console.log('Popup triggered');
-    const confirmed = await showOrderFlowModalAfterClick();
-    if (!confirmed) {
-      return;
-    }
-
     const response = await fetch('/orders', {
       method: 'POST',
       headers: {
@@ -240,8 +203,12 @@ async function placeOrder(kitId, kitName) {
       throw new Error(payload.error || 'Failed to place order.');
     }
 
-    window.alert(`Order placed for ${kitName}. Tracking is available on your dashboard.`);
-    window.location.href = '/dashboard.html';
+    console.log('Order created:', payload);
+    const popupTitle = document.getElementById('order-flow-title');
+    if (popupTitle) {
+      popupTitle.textContent = `Order placed for ${kitName}`;
+    }
+    showOrderPopup();
   } catch (error) {
     console.error('Order error:', error);
     window.alert(error.message);
@@ -250,27 +217,87 @@ async function placeOrder(kitId, kitName) {
   }
 }
 
+async function handlePlaceOrder(event) {
+  event.preventDefault();
+  console.log('Button clicked');
+
+  const button = event.currentTarget;
+  const id = Number(button?.dataset.id || 0);
+  const kitName = button?.dataset.kitName || 'your kit';
+
+  if (!id) {
+    console.error('Place order missing data-id');
+    return;
+  }
+
+  console.log('Place order clicked:', id);
+  await withButtonLoading(button, 'Processing...', () => placeOrder(id, kitName));
+}
+
+async function handleViewDetails(event) {
+  event.preventDefault();
+  console.log('Button clicked');
+
+  const button = event.currentTarget;
+  const id = button?.dataset.id;
+  const detailsId = button?.dataset.toggleDetails;
+
+  console.log('View details clicked:', id);
+
+  try {
+    if (!detailsId) {
+      window.location.href = `/product.html?id=${encodeURIComponent(id || '')}`;
+      return;
+    }
+
+    const details = document.getElementById(detailsId);
+    const isHidden = details?.classList.contains('hidden');
+    details?.classList.toggle('hidden', !isHidden);
+    button.textContent = isHidden ? 'Hide Details' : 'View Details';
+    details?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (error) {
+    console.error('View details error:', error);
+  }
+}
+
 function wirePopupControls() {
-  if (!orderFlowModal) return;
+  if (!orderPopup) return;
 
   const confirmButton = document.getElementById('confirm-order-flow');
   const cancelButton = document.getElementById('cancel-order-flow');
-  const closeButton = document.getElementById('close-order-flow');
+  const closeButton = document.getElementById('close-order-popup');
 
-  confirmButton?.addEventListener('click', () => closePopup(true));
-  cancelButton?.addEventListener('click', () => closePopup(false));
-  closeButton?.addEventListener('click', () => closePopup(false));
+  confirmButton?.addEventListener('click', () => {
+    closeOrderPopup();
+    window.location.href = '/dashboard.html';
+  });
+  cancelButton?.addEventListener('click', closeOrderPopup);
+  closeButton?.addEventListener('click', closeOrderPopup);
 
-  orderFlowModal.addEventListener('click', (event) => {
-    if (event.target === orderFlowModal) {
-      closePopup(false);
+  orderPopup.addEventListener('click', (event) => {
+    if (event.target === orderPopup) {
+      closeOrderPopup();
     }
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && showOrderPopup) {
-      closePopup(false);
+    if (event.key === 'Escape' && !orderPopup.classList.contains('hidden')) {
+      closeOrderPopup();
     }
+  });
+}
+
+function bindStoreButtonEvents() {
+  document.querySelectorAll('.place-order-btn').forEach((button) => {
+    if (button.dataset.bound === 'true') return;
+    button.addEventListener('click', handlePlaceOrder);
+    button.dataset.bound = 'true';
+  });
+
+  document.querySelectorAll('.view-details-btn').forEach((button) => {
+    if (button.dataset.bound === 'true') return;
+    button.addEventListener('click', handleViewDetails);
+    button.dataset.bound = 'true';
   });
 }
 
@@ -292,6 +319,7 @@ async function loadKits() {
     payload.kits.forEach((kit) => {
       kitGrid.appendChild(renderKit(kit));
     });
+    bindStoreButtonEvents();
     highlightRequestedItems();
   } catch (error) {
     console.error('[Store] Kits load failed:', error.message);
@@ -351,8 +379,10 @@ async function loadServices() {
   }
 }
 
-loadKits();
-loadProducts();
-loadServices();
-wirePopupControls();
-toggleOrderFlowModal();
+document.addEventListener('DOMContentLoaded', () => {
+  loadKits();
+  loadProducts();
+  loadServices();
+  wirePopupControls();
+  closeOrderPopup();
+});

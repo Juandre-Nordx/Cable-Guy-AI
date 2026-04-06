@@ -11,16 +11,34 @@ function detectRecommendedKit(aiReply = '') {
   const normalizedReply = aiReply.toLowerCase();
 
   if (normalizedReply.includes('bridge kit') || normalizedReply.includes('wireless bridge')) {
-    return { name: 'Bridge Kit', type: 'bridge' };
+    return { name: 'Bridge Kit', recommendedCategory: 'bridge' };
+  }
+  if (normalizedReply.includes('ups') || normalizedReply.includes('battery backup') || normalizedReply.includes('power backup')) {
+    return { name: 'Backup Kit', recommendedCategory: 'backup' };
+  }
+  if (
+    normalizedReply.includes('camera') ||
+    normalizedReply.includes('cctv') ||
+    normalizedReply.includes('security kit')
+  ) {
+    return { name: 'Security Kit', recommendedCategory: 'security' };
+  }
+  if (
+    normalizedReply.includes('cabinet') ||
+    normalizedReply.includes('pole') ||
+    normalizedReply.includes('junction box') ||
+    normalizedReply.includes('infrastructure')
+  ) {
+    return { name: 'Infrastructure Kit', recommendedCategory: 'infrastructure' };
   }
   if (normalizedReply.includes('business network kit') || normalizedReply.includes('business kit')) {
-    return { name: 'Business Network Kit', type: 'business' };
+    return { name: 'Business Network Kit', recommendedCategory: 'business' };
+  }
+  if (normalizedReply.includes('smart home') || normalizedReply.includes('smart device') || normalizedReply.includes('iot')) {
+    return { name: 'Smart Kit', recommendedCategory: 'smart' };
   }
   if (normalizedReply.includes('home wifi kit') || normalizedReply.includes('home wi-fi kit')) {
-    return { name: 'Home WiFi Kit', type: 'home' };
-  }
-  if (normalizedReply.includes('cctv')) {
-    return { name: 'CCTV Kit', type: 'cctv' };
+    return { name: 'Home WiFi Kit', recommendedCategory: 'home' };
   }
 
   return null;

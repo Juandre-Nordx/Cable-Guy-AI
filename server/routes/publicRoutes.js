@@ -8,7 +8,7 @@ router.get('/kits', async (_req, res) => {
       SELECT
         k.id,
         k.name,
-        k.type,
+        k.category,
         k.price,
         k.difficulty,
         k.requires_technician,

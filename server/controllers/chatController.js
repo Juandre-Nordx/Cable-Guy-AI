@@ -66,34 +66,34 @@ async function callOllama(userMessage) {
 }
 
 function mapWizardRecommendation({ problem, property_type, distance, self_install }) {
-  let recommendedKitType = 'home';
+  let recommendedCategory = 'home';
 
   if (problem === 'security') {
-    recommendedKitType = 'cctv';
+    recommendedCategory = 'security';
   } else if (distance === 'separate_building' || property_type === 'multiple_buildings' || problem === 'between_buildings') {
-    recommendedKitType = 'bridge';
+    recommendedCategory = 'bridge';
   } else if (property_type === 'office') {
-    recommendedKitType = 'business';
+    recommendedCategory = 'business';
   }
 
   const complexSetup =
-    recommendedKitType === 'bridge' ||
-    recommendedKitType === 'business' ||
+    recommendedCategory === 'bridge' ||
+    recommendedCategory === 'business' ||
     property_type === 'large_home' ||
     distance === 'separate_building';
 
   const needsTechnician = !self_install || complexSetup;
 
   const reasons = [];
-  if (recommendedKitType === 'bridge') reasons.push('long-distance or separate-building connectivity');
-  if (recommendedKitType === 'cctv') reasons.push('security monitoring needs');
-  if (recommendedKitType === 'business') reasons.push('office-grade network capacity');
-  if (recommendedKitType === 'home') reasons.push('home WiFi coverage optimization');
+  if (recommendedCategory === 'bridge') reasons.push('long-distance or separate-building connectivity');
+  if (recommendedCategory === 'security') reasons.push('security monitoring needs');
+  if (recommendedCategory === 'business') reasons.push('office-grade network capacity');
+  if (recommendedCategory === 'home') reasons.push('home WiFi coverage optimization');
 
   return {
-    recommendedKitType,
+    recommendedCategory,
     needsTechnician,
-    message: `Based on your answers, we recommend the ${recommendedKitType} kit for ${reasons[0]}.`
+    message: `Based on your answers, we recommend the ${recommendedCategory} kit for ${reasons[0]}.`
   };
 }
 
@@ -139,10 +139,11 @@ async function chat(req, res) {
 
     const kitSignal = detectRecommendedKit(aiReply);
     const needsTechnician = detectNeedsTechnician(aiReply);
+    const recommendedCategory = kitSignal?.recommendedCategory || null;
 
     let kit = null;
-    if (kitSignal?.type) {
-      const result = await query('SELECT * FROM kits WHERE type = $1 LIMIT 1;', [kitSignal.type]);
+    if (recommendedCategory) {
+      const result = await query('SELECT * FROM kits WHERE category = $1 LIMIT 1;', [recommendedCategory]);
       kit = result.rows[0] || null;
     }
 
@@ -151,6 +152,7 @@ async function chat(req, res) {
       reply: aiReply,
       kit,
       recommendedKit: kit,
+      recommendedCategory,
       needsTechnician
     });
   } catch (error) {

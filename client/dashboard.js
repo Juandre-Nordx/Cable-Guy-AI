@@ -75,7 +75,7 @@ async function loadOrders() {
         (order) => `
           <article class="card">
             <p><strong>Order #${order.id}</strong></p>
-            <p>Kit: ${order.kit_name || 'Unknown'} (${order.kit_type || '-'})</p>
+            <p>Kit: ${order.kit_name || 'Unknown'} (${order.kit_category || '-'})</p>
             <p>Status: <strong>${order.status}</strong></p>
             <p class="subtext">Placed: ${new Date(order.created_at).toLocaleString()}</p>
             <div id="order-notes-${order.id}" class="order-notes-feed subtext">Loading notes...</div>

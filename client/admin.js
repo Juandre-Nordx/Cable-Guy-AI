@@ -308,7 +308,7 @@ async function submitKit(event) {
 
     const payload = {
       name: data.get('name')?.toString().trim(),
-      type: data.get('type')?.toString(),
+      category: data.get('category')?.toString(),
       price: Number(data.get('price')),
       difficulty: data.get('difficulty')?.toString(),
       requires_technician: data.get('requires_technician') === 'on',
@@ -419,7 +419,7 @@ function renderKitsTable() {
       <tr>
         <td>${kit.id}</td>
         <td>${kit.name}</td>
-        <td>${kit.type}</td>
+        <td>${kit.category}</td>
         <td>$${Number(kit.price).toFixed(2)}</td>
         <td>${kit.difficulty}</td>
         <td>${kit.requires_technician ? 'Yes' : 'No'}</td>
@@ -432,7 +432,7 @@ function renderKitsTable() {
     .join('');
 
   document.getElementById('kits-table-wrap').innerHTML = state.kits.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No kits found.</p>';
 }
 

@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS kits (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart')),
+  category TEXT NOT NULL,
   price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
   difficulty TEXT NOT NULL,
   requires_technician BOOLEAN NOT NULL DEFAULT FALSE,
@@ -73,6 +73,12 @@ SET category = CASE
   WHEN LOWER(category) = 'smart' THEN 'smart'
   ELSE 'home'
 END;
+
+-- Apply the category CHECK constraint only after all legacy values have been normalized
+ALTER TABLE kits DROP CONSTRAINT IF EXISTS kits_type_check;
+ALTER TABLE kits DROP CONSTRAINT IF EXISTS kits_category_check;
+ALTER TABLE kits ADD CONSTRAINT kits_category_check
+  CHECK (category IN ('home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart'));
 
 CREATE TABLE IF NOT EXISTS kit_steps (
   id SERIAL PRIMARY KEY,

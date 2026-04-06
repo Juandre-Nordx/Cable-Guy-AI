@@ -22,7 +22,6 @@ const wizardState = {
   nodesById: new Map(),
   outgoingByNodeId: new Map()
 };
-const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
 
 function scrollToBottom() {
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -45,7 +44,7 @@ function renderKitCard(kit) {
   card.innerHTML = `
     <h3>${kit.name}</h3>
     <p class="subtext">${kit.description || 'AI recommended this kit based on your diagnosis.'}</p>
-    <p><strong>Price:</strong> ${kit.price ? `$${Number(kit.price).toFixed(2)}` : 'See store'}</p>
+    <p><strong>Price:</strong> ${kit.price ? formatCurrency(kit.price, kit.currency) : 'See store'}</p>
     <a class="button secondary" href="/store.html?category=${encodeURIComponent(kit.category || '')}">View Kit</a>
   `;
 
@@ -93,7 +92,7 @@ function renderWizardResult(payload) {
                   ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" loading="lazy" />` : '<div class="recommended-image-placeholder">No Image</div>'}
                   <h5>${item.name || `${item.type} #${item.id}`}</h5>
                   <p class="subtext">${item.type}</p>
-                  <p><strong>Price:</strong> ${formatPrice(item.price, item.currency)}</p>
+                  <p><strong>Price:</strong> ${formatCurrency(item.price, item.currency)}</p>
                   <div class="kit-card-actions">
                     <a class="button secondary" href="${buildStoreLink(item)}">View</a>
                     <button class="button primary" type="button" data-buy-item="${encodeURIComponent(JSON.stringify({ type: item.type, id: item.id, category: item.category || '' }))}">Buy</button>
@@ -159,13 +158,6 @@ function handleWizardBuy(rawItem) {
   window.location.href = buildStoreLink(item);
 }
 
-function formatPrice(amount, currency = 'ZAR') {
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount)) return 'Contact us';
-  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
-  return `${symbol}${numericAmount.toFixed(2)}`;
-}
-
 function resolveItemLink(item, action = 'view') {
   if (item.type === 'product') return `/store.html#product-grid`;
   if (item.type === 'service') return '/store.html';
@@ -176,11 +168,12 @@ function resolveItemLink(item, action = 'view') {
   return '/store.html';
 }
 
-function formatPrice(amount, currency = 'ZAR') {
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount)) return 'Contact us';
-  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
-  return `${symbol}${numericAmount.toFixed(2)}`;
+function formatCurrency(price, currency = 'ZAR') {
+  const numericPrice = Number(price);
+  if (!Number.isFinite(numericPrice)) return 'Contact us';
+  if (currency === 'ZAR') return `R ${numericPrice.toFixed(2)}`;
+  if (currency === 'USD') return `$ ${numericPrice.toFixed(2)}`;
+  return `${numericPrice.toFixed(2)}`;
 }
 
 function setWizardTree(payload) {

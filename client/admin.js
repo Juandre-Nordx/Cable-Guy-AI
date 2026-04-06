@@ -160,6 +160,14 @@ async function loadOrders() {
   renderOrdersTable();
 }
 
+function renderAdminOrderItems(items = [], currency = state.settings.currency || 'ZAR') {
+  if (!Array.isArray(items) || !items.length) return '-';
+
+  return items
+    .map((item) => `${item.name} (${item.type}) x${item.qty}`)
+    .join('<br />');
+}
+
 function renderOrdersTable() {
   const rows = state.orders
     .map(
@@ -167,7 +175,8 @@ function renderOrdersTable() {
       <tr>
         <td>${order.id}</td>
         <td>${order.customer_name || order.customer_email || '-'}</td>
-        <td>${order.kit_name || '-'}</td>
+        <td>${renderAdminOrderItems(order.items, order.currency)}</td>
+        <td>${formatPrice(order.total, order.currency)}</td>
         <td>
           <select data-order-id="${order.id}" ${order.status === 'done' ? 'disabled' : ''}>
             ${ORDER_STATUSES.map((status) => `<option value="${status}" ${order.status === status ? 'selected' : ''}>${status}</option>`).join('')}
@@ -184,7 +193,7 @@ function renderOrdersTable() {
         </td>
       </tr>
       <tr id="order-notes-row-${order.id}" class="hidden">
-        <td colspan="6">
+        <td colspan="7">
           <div class="order-notes-panel">
             <div id="order-notes-${order.id}" class="order-notes-feed subtext">Loading notes...</div>
             <form class="order-note-form" data-order-note-form="${order.id}">
@@ -199,69 +208,73 @@ function renderOrdersTable() {
     .join('');
 
   document.getElementById('orders-table-wrap').innerHTML = state.orders.length
-    ? `<table><thead><tr><th>Order ID</th><th>User</th><th>Kit</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>Order ID</th><th>User</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No orders found.</p>';
 
-  document.querySelectorAll('[data-update-order]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const orderId = button.dataset.updateOrder;
-      const status = document.querySelector(`select[data-order-id="${orderId}"]`)?.value;
-      if (!status) return;
-
-      try {
-        await apiFetch(`/admin/orders/${orderId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status })
-        });
-
-        setGlobalMessage(`Order #${orderId} updated to ${status}.`, 'success');
-        await loadOrders();
-        await loadDashboard();
-      } catch (error) {
-        console.error('[Admin] order update failed:', error.message);
-        setGlobalMessage(error.message, 'warning');
-      }
-    });
-  });
-
-  document.querySelectorAll('[data-toggle-notes]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const orderId = button.dataset.toggleNotes;
-      const row = document.getElementById(`order-notes-row-${orderId}`);
-      const hidden = row.classList.contains('hidden');
-      row.classList.toggle('hidden', !hidden);
-      button.textContent = hidden ? 'Hide Notes' : 'Notes';
-
-      if (hidden) {
-        await loadAdminOrderNotes(orderId);
-      }
-    });
-  });
-
-  document.querySelectorAll('[data-order-note-form]').forEach((form) => {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const orderId = form.dataset.orderNoteForm;
-      const message = form.querySelector('textarea[name="message"]')?.value?.trim();
-      if (!message) return;
-
-      try {
-        await apiFetch(`/admin/orders/${orderId}/note`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message })
-        });
-
-        form.reset();
-        await loadAdminOrderNotes(orderId);
-        setGlobalMessage(`Note added to order #${orderId}.`, 'success');
-      } catch (error) {
-        setGlobalMessage(error.message, 'warning');
-      }
-    });
-  });
 }
+
+document.addEventListener('click', async (event) => {
+  const updateBtn = event.target.closest('[data-update-order]');
+  const toggleNotesBtn = event.target.closest('[data-toggle-notes]');
+
+  if (updateBtn) {
+    const orderId = updateBtn.dataset.updateOrder;
+    const status = document.querySelector(`select[data-order-id="${orderId}"]`)?.value;
+    if (!status) return;
+
+    try {
+      await apiFetch(`/admin/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+
+      setGlobalMessage(`Order #${orderId} updated to ${status}.`, 'success');
+      await loadOrders();
+      await loadDashboard();
+    } catch (error) {
+      console.error('[Admin] order update failed:', error.message);
+      setGlobalMessage(error.message, 'warning');
+    }
+    return;
+  }
+
+  if (toggleNotesBtn) {
+    const orderId = toggleNotesBtn.dataset.toggleNotes;
+    const row = document.getElementById(`order-notes-row-${orderId}`);
+    const hidden = row.classList.contains('hidden');
+    row.classList.toggle('hidden', !hidden);
+    toggleNotesBtn.textContent = hidden ? 'Hide Notes' : 'Notes';
+
+    if (hidden) {
+      await loadAdminOrderNotes(orderId);
+    }
+  }
+});
+
+document.addEventListener('submit', async (event) => {
+  const form = event.target.closest('[data-order-note-form]');
+  if (!form) return;
+
+  event.preventDefault();
+  const orderId = form.dataset.orderNoteForm;
+  const message = form.querySelector('textarea[name="message"]')?.value?.trim();
+  if (!message) return;
+
+  try {
+    await apiFetch(`/admin/orders/${orderId}/note`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+
+    form.reset();
+    await loadAdminOrderNotes(orderId);
+    setGlobalMessage(`Note added to order #${orderId}.`, 'success');
+  } catch (error) {
+    setGlobalMessage(error.message, 'warning');
+  }
+});
 
 async function loadAdminOrderNotes(orderId) {
   const notesContainer = document.getElementById(`order-notes-${orderId}`);

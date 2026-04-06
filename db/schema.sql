@@ -119,9 +119,22 @@ CREATE TABLE IF NOT EXISTS kit_items (
 CREATE TABLE IF NOT EXISTS orders (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  kit_id INTEGER REFERENCES kits(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'placed' CHECK (status IN ('placed', 'processing', 'out_for_delivery', 'delivered', 'done')),
+  total NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
+  currency TEXT NOT NULL DEFAULT 'ZAR',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS total NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'ZAR';
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  item_id INTEGER NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('product', 'kit', 'service')),
+  qty INTEGER NOT NULL CHECK (qty > 0),
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0)
 );
 
 

@@ -1,34 +1,128 @@
-const { query } = require('../models/db');
+const { pool, query } = require('../models/db');
 const { validateEnum, requiredString } = require('../middleware/validate');
 
 const ORDER_STATUSES = ['placed', 'processing', 'out_for_delivery', 'delivered', 'done'];
+const ORDERABLE_TABLES = {
+  kit: 'kits',
+  product: 'products',
+  service: 'services'
+};
+
+async function getCurrency(client) {
+  const result = await client.query("SELECT value FROM settings WHERE key = 'currency' LIMIT 1;");
+  return result.rows[0]?.value || 'ZAR';
+}
+
+async function normalizeOrderItems(rawItems, client) {
+  const cleanItems = Array.isArray(rawItems) ? rawItems : [];
+
+  if (!cleanItems.length) {
+    throw new Error('At least one cart item is required.');
+  }
+
+  const merged = new Map();
+
+  cleanItems.forEach((item) => {
+    const itemId = Number(item?.id);
+    const type = String(item?.type || '').toLowerCase();
+    const qty = Number(item?.qty || 1);
+
+    if (!Number.isInteger(itemId) || itemId <= 0 || !ORDERABLE_TABLES[type] || !Number.isInteger(qty) || qty <= 0) {
+      throw new Error('Each item must have a valid id, type (product|kit|service), and qty > 0.');
+    }
+
+    const key = `${type}:${itemId}`;
+    const existing = merged.get(key);
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      merged.set(key, { item_id: itemId, type, qty });
+    }
+  });
+
+  const validated = [];
+
+  for (const item of merged.values()) {
+    const tableName = ORDERABLE_TABLES[item.type];
+    const result = await client.query(`SELECT id, name, price FROM ${tableName} WHERE id = $1 LIMIT 1;`, [item.item_id]);
+    const row = result.rows[0];
+
+    if (!row) {
+      throw new Error(`Item not found for ${item.type} #${item.item_id}.`);
+    }
+
+    validated.push({
+      ...item,
+      name: row.name,
+      price: Number(row.price)
+    });
+  }
+
+  return validated;
+}
 
 async function createOrder(req, res) {
+  const client = await pool.connect();
+
   try {
-    const kitId = Number(req.body?.kit_id);
+    const legacyKitId = Number(req.body?.kit_id);
+    const submittedItems = Array.isArray(req.body?.items) ? req.body.items : [];
 
-    if (!Number.isInteger(kitId) || kitId <= 0) {
-      return res.status(400).json({ success: false, error: 'Valid kit_id is required.' });
+    if (Number.isInteger(legacyKitId) && legacyKitId > 0 && submittedItems.length === 0) {
+      submittedItems.push({ id: legacyKitId, type: 'kit', qty: 1 });
     }
 
-    const kitResult = await query('SELECT id FROM kits WHERE id = $1;', [kitId]);
-    if (!kitResult.rows[0]) {
-      return res.status(404).json({ success: false, error: 'Kit not found.' });
-    }
+    await client.query('BEGIN');
+    const currency = await getCurrency(client);
+    const items = await normalizeOrderItems(submittedItems, client);
+    const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
-    const result = await query(
+    const orderResult = await client.query(
       `
-      INSERT INTO orders (user_id, kit_id, status)
-      VALUES ($1, $2, 'placed')
-      RETURNING *;
+      INSERT INTO orders (user_id, status, total, currency)
+      VALUES ($1, 'placed', $2, $3)
+      RETURNING id, user_id, status, total, currency, created_at;
       `,
-      [req.user.id, kitId]
+      [req.user.id, total, currency]
     );
 
-    return res.status(201).json({ success: true, message: 'Order placed successfully.', order: result.rows[0] });
+    const order = orderResult.rows[0];
+
+    for (const item of items) {
+      await client.query(
+        `
+        INSERT INTO order_items (order_id, item_id, type, qty, price)
+        VALUES ($1, $2, $3, $4, $5);
+        `,
+        [order.id, item.item_id, item.type, item.qty, item.price]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    return res.status(201).json({
+      success: true,
+      message: 'Order placed successfully.',
+      order,
+      items: items.map((item) => ({
+        item_id: item.item_id,
+        type: item.type,
+        qty: item.qty,
+        price: item.price,
+        name: item.name
+      }))
+    });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('[POST /orders] Failed:', error.message);
+
+    if (error.message.includes('required') || error.message.includes('valid') || error.message.includes('not found')) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
     return res.status(500).json({ success: false, error: 'Failed to place order.' });
+  } finally {
+    client.release();
   }
 }
 
@@ -36,10 +130,33 @@ async function listMyOrders(req, res) {
   try {
     const result = await query(
       `
-      SELECT o.*, k.name AS kit_name, k.category AS kit_category, k.price AS kit_price
+      SELECT
+        o.id,
+        o.user_id,
+        o.status,
+        o.total,
+        o.currency,
+        o.created_at,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', oi.id,
+              'item_id', oi.item_id,
+              'type', oi.type,
+              'qty', oi.qty,
+              'price', oi.price,
+              'name', COALESCE(p.name, k.name, s.name, 'Item')
+            )
+          ) FILTER (WHERE oi.id IS NOT NULL),
+          '[]'::json
+        ) AS items
       FROM orders o
-      LEFT JOIN kits k ON k.id = o.kit_id
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN products p ON oi.type = 'product' AND p.id = oi.item_id
+      LEFT JOIN kits k ON oi.type = 'kit' AND k.id = oi.item_id
+      LEFT JOIN services s ON oi.type = 'service' AND s.id = oi.item_id
       WHERE o.user_id = $1
+      GROUP BY o.id
       ORDER BY o.created_at DESC;
       `,
       [req.user.id]
@@ -59,18 +176,34 @@ async function listAllOrders(req, res) {
       SELECT
         o.id,
         o.user_id,
-        o.kit_id,
         o.status,
+        o.total,
+        o.currency,
         o.created_at,
         u.name AS customer_name,
         u.email AS customer_email,
         u.contact_number AS customer_contact_number,
         u.address AS customer_address,
-        k.name AS kit_name,
-        k.category AS kit_category
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', oi.id,
+              'item_id', oi.item_id,
+              'type', oi.type,
+              'qty', oi.qty,
+              'price', oi.price,
+              'name', COALESCE(p.name, k.name, s.name, 'Item')
+            )
+          ) FILTER (WHERE oi.id IS NOT NULL),
+          '[]'::json
+        ) AS items
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_id
-      LEFT JOIN kits k ON k.id = o.kit_id
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN products p ON oi.type = 'product' AND p.id = oi.item_id
+      LEFT JOIN kits k ON oi.type = 'kit' AND k.id = oi.item_id
+      LEFT JOIN services s ON oi.type = 'service' AND s.id = oi.item_id
+      GROUP BY o.id, u.id
       ORDER BY o.created_at DESC;
       `
     );

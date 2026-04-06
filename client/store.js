@@ -2,8 +2,11 @@ const hasStoreAccess = typeof requireStoreAccess === 'function' ? requireStoreAc
 
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
+const orderFlowModal = document.getElementById('order-flow-modal');
 const query = new URLSearchParams(window.location.search);
 const highlightedCategory = query.get('category');
+const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
+const ORDER_FLOW_SEEN_KEY = 'order-flow-popup-seen';
 
 function escapeHtml(text = '') {
   return text
@@ -67,10 +70,10 @@ function renderKit(kit) {
     ${kit.requires_technician ? '<p class="warning">⚠️ Recommended: Professional Installation</p>' : ''}
     <p><strong>Category:</strong> ${kit.category}</p>
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
-    <p><strong>Price:</strong> $${Number(kit.price).toFixed(2)}</p>
+    <p><strong>Price:</strong> ${formatPrice(kit.price, kit.currency)}</p>
     <div class="kit-card-actions">
       <button class="button secondary" data-toggle-details="${detailsId}">View Details</button>
-      <button class="button primary" data-kit-id="${kit.id}">Buy Kit</button>
+      <button class="button primary" data-kit-id="${kit.id}">Place Order</button>
     </div>
     <section id="${detailsId}" class="kit-details hidden">
       ${kit.image_url ? `<img src="${kit.image_url}" alt="${kit.name}" class="kit-main-image" loading="lazy" />` : ''}
@@ -104,10 +107,55 @@ function renderProduct(product) {
     <h3>${product.name}</h3>
     <p class="subtext">${product.description || ''}</p>
     <p><strong>Category:</strong> ${product.category}</p>
-    <p><strong>Price:</strong> $${Number(product.price).toFixed(2)}</p>
+    <p><strong>Price:</strong> ${formatPrice(product.price, product.currency)}</p>
   `;
 
   return card;
+}
+
+function formatPrice(amount, currency = 'ZAR') {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return '-';
+
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  const formatted = numericAmount.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(numericAmount) ? 0 : 2,
+    maximumFractionDigits: 2
+  });
+  return `${symbol} ${formatted}`;
+}
+
+function showOrderFlowModalOnce() {
+  if (!orderFlowModal) {
+    return Promise.resolve(true);
+  }
+
+  if (sessionStorage.getItem(ORDER_FLOW_SEEN_KEY) === 'true') {
+    return Promise.resolve(true);
+  }
+
+  orderFlowModal.classList.remove('hidden');
+
+  return new Promise((resolve) => {
+    const confirmButton = document.getElementById('confirm-order-flow');
+    const cancelButton = document.getElementById('cancel-order-flow');
+
+    const cleanup = (confirmed) => {
+      orderFlowModal.classList.add('hidden');
+      confirmButton?.removeEventListener('click', onConfirm);
+      cancelButton?.removeEventListener('click', onCancel);
+      if (confirmed) {
+        sessionStorage.setItem(ORDER_FLOW_SEEN_KEY, 'true');
+      }
+      resolve(confirmed);
+    };
+
+    const onConfirm = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+
+    confirmButton?.addEventListener('click', onConfirm);
+    cancelButton?.addEventListener('click', onCancel);
+  });
 }
 
 async function placeOrder(kitId, kitName) {
@@ -115,6 +163,11 @@ async function placeOrder(kitId, kitName) {
 
   if (!token) {
     window.location.href = '/login.html';
+    return;
+  }
+
+  const confirmed = await showOrderFlowModalOnce();
+  if (!confirmed) {
     return;
   }
 

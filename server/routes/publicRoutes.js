@@ -5,11 +5,18 @@ router.get('/kits', async (_req, res) => {
   try {
     const result = await query(
       `
+      WITH current_currency AS (
+        SELECT COALESCE(
+          (SELECT value FROM settings WHERE key = 'currency' LIMIT 1),
+          'ZAR'
+        ) AS currency
+      )
       SELECT
         k.id,
         k.name,
         k.category,
         k.price,
+        cc.currency,
         k.difficulty,
         k.requires_technician,
         k.description,
@@ -31,8 +38,9 @@ router.get('/kits', async (_req, res) => {
           '[]'::json
         ) AS steps
       FROM kits k
+      CROSS JOIN current_currency cc
       LEFT JOIN kit_steps ks ON ks.kit_id = k.id
-      GROUP BY k.id
+      GROUP BY k.id, cc.currency
       ORDER BY k.id ASC;
       `
     );
@@ -46,7 +54,20 @@ router.get('/kits', async (_req, res) => {
 
 router.get('/products', async (_req, res) => {
   try {
-    const result = await query('SELECT * FROM products ORDER BY id DESC;');
+    const result = await query(
+      `
+      WITH current_currency AS (
+        SELECT COALESCE(
+          (SELECT value FROM settings WHERE key = 'currency' LIMIT 1),
+          'ZAR'
+        ) AS currency
+      )
+      SELECT p.*, cc.currency
+      FROM products p
+      CROSS JOIN current_currency cc
+      ORDER BY p.id DESC;
+      `
+    );
     return res.json({ success: true, products: result.rows });
   } catch (error) {
     console.error('[GET /products] Failed:', error.message);

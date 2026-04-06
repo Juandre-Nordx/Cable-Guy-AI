@@ -622,6 +622,49 @@ label {
   position: relative;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.62);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: min(680px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  padding: 1.1rem;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+}
+
+.order-flow-list {
+  margin: 0.75rem 0 0.9rem 1.2rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.order-flow-note {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  margin: 0 0 1rem;
+}
+
+@media (max-width: 640px) {
+  .modal-card {
+    padding: 0.9rem;
+  }
+
+  .order-flow-list {
+    gap: 0.35rem;
+    margin-left: 1rem;
+  }
+}
+
 .wizard-tree > .wizard-tree-node-wrap {
   padding-left: 0;
 }

@@ -4,6 +4,7 @@ const { ORDER_STATUSES } = require('./orderController');
 
 const KIT_CATEGORIES = ['home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart'];
 const WIZARD_NODE_TYPES = ['question', 'result'];
+const ALLOWED_CURRENCIES = ['ZAR', 'USD', 'EUR'];
 
 async function createProduct(req, res) {
   try {
@@ -211,6 +212,54 @@ async function uploadImage(req, res) {
 
   const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
   return res.status(201).json({ success: true, imageUrl });
+}
+
+async function getAdminSettings(_req, res) {
+  try {
+    const currencyResult = await query(
+      `
+      SELECT value
+      FROM settings
+      WHERE key = 'currency'
+      LIMIT 1;
+      `
+    );
+
+    const currency = currencyResult.rows[0]?.value || 'ZAR';
+    return res.json({ success: true, settings: { currency } });
+  } catch (error) {
+    console.error('[GET /admin/settings] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load settings.' });
+  }
+}
+
+async function updateAdminSettings(req, res) {
+  try {
+    const rawCurrency = req.body?.currency;
+    const currency = requiredString(rawCurrency) ? rawCurrency.trim().toUpperCase() : '';
+
+    if (!validateEnum(currency, ALLOWED_CURRENCIES)) {
+      return res.status(400).json({
+        success: false,
+        error: `Valid currency is required (${ALLOWED_CURRENCIES.join(', ')}).`
+      });
+    }
+
+    await query(
+      `
+      INSERT INTO settings (key, value)
+      VALUES ('currency', $1)
+      ON CONFLICT (key)
+      DO UPDATE SET value = EXCLUDED.value;
+      `,
+      [currency]
+    );
+
+    return res.json({ success: true, message: 'System settings updated.', settings: { currency } });
+  } catch (error) {
+    console.error('[PUT /admin/settings] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update settings.' });
+  }
 }
 
 async function listWizardNodes(_req, res) {
@@ -519,6 +568,8 @@ module.exports = {
   createService,
   listUsers,
   dashboard,
+  getAdminSettings,
+  updateAdminSettings,
   uploadImage,
   listWizardNodes,
   createWizardNode,

@@ -5,12 +5,16 @@ if (session && session.user.role !== 'admin') {
 }
 
 const ORDER_STATUSES = ['placed', 'processing', 'out_for_delivery', 'delivered', 'done'];
+const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
 const state = {
   users: [],
   orders: [],
   products: [],
   kits: [],
   services: [],
+  settings: {
+    currency: 'ZAR'
+  },
   wizard: {
     nodes: [],
     edges: [],
@@ -40,6 +44,7 @@ function bindLayoutEvents() {
   document.getElementById('refresh-products').addEventListener('click', loadProducts);
   document.getElementById('refresh-kits').addEventListener('click', loadKits);
   document.getElementById('refresh-services').addEventListener('click', loadServices);
+  document.getElementById('refresh-settings').addEventListener('click', loadSettings);
   document.getElementById('refresh-wizard').addEventListener('click', loadWizardBuilder);
   document.getElementById('wizard-add-node').addEventListener('click', createWizardNodeDraft);
   document.getElementById('wizard-add-connection').addEventListener('click', handleAddConnection);
@@ -51,6 +56,7 @@ function bindFormEvents() {
   document.getElementById('product-form').addEventListener('submit', submitProduct);
   document.getElementById('kit-form').addEventListener('submit', submitKit);
   document.getElementById('service-form').addEventListener('submit', submitService);
+  document.getElementById('settings-form').addEventListener('submit', submitSettings);
   document.getElementById('wizard-node-form').addEventListener('submit', submitWizardNode);
   document.getElementById('wizard-delete-node').addEventListener('click', deleteWizardNodeBySelection);
   document.querySelector('#wizard-node-form select[name="type"]').addEventListener('change', toggleWizardResultFields);
@@ -58,12 +64,19 @@ function bindFormEvents() {
 
 async function bootAdmin() {
   try {
-    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadWizardBuilder()]);
+    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadSettings(), loadWizardBuilder()]);
     setGlobalMessage('Admin dashboard loaded.', 'success');
   } catch (error) {
     console.error('[Admin] boot failed:', error);
     setGlobalMessage(error.message || 'Admin dashboard failed to load.', 'warning');
   }
+}
+
+function formatPrice(amount, currency = state.settings.currency || 'ZAR') {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return '-';
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  return `${symbol}${numericAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function activateSection(sectionId) {
@@ -411,7 +424,7 @@ function renderProductsTable() {
         <td>${product.id}</td>
         <td>${product.name}</td>
         <td>${product.category}</td>
-        <td>$${Number(product.price).toFixed(2)}</td>
+        <td>${formatPrice(product.price, product.currency)}</td>
         <td>${product.image_url ? `<a href="${product.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
       </tr>
     `
@@ -437,7 +450,7 @@ function renderKitsTable() {
         <td>${kit.id}</td>
         <td>${kit.name}</td>
         <td>${kit.category}</td>
-        <td>$${Number(kit.price).toFixed(2)}</td>
+        <td>${formatPrice(kit.price, kit.currency)}</td>
         <td>${kit.difficulty}</td>
         <td>${kit.requires_technician ? 'Yes' : 'No'}</td>
         <td>${kit.instructions ? 'Included' : '-'}</td>
@@ -457,6 +470,36 @@ async function loadServices() {
   const payload = await fetch('/services').then((response) => response.json());
   state.services = payload.services || [];
   renderServicesTable();
+}
+
+async function loadSettings() {
+  const payload = await apiFetch('/admin/settings');
+  state.settings.currency = payload.settings?.currency || 'ZAR';
+  const form = document.getElementById('settings-form');
+  if (form) {
+    form.elements.currency.value = state.settings.currency;
+  }
+}
+
+async function submitSettings(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const currency = form.elements.currency.value;
+
+  try {
+    const payload = await apiFetch('/admin/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currency })
+    });
+
+    state.settings.currency = payload.settings?.currency || currency;
+    setFormMessage('settings-message', 'System settings updated successfully.', 'success');
+    await Promise.all([loadProducts(), loadKits()]);
+  } catch (error) {
+    console.error('[Admin] settings submit failed:', error.message);
+    setFormMessage('settings-message', error.message, 'warning');
+  }
 }
 
 function renderServicesTable() {

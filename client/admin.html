@@ -21,6 +21,7 @@
           <button class="admin-nav-link" data-target="products-section">Products</button>
           <button class="admin-nav-link" data-target="kits-section">Kits</button>
           <button class="admin-nav-link" data-target="services-section">Services</button>
+          <button class="admin-nav-link" data-target="settings-section">System Settings</button>
           <button class="admin-nav-link" data-target="wizard-section">Wizard Builder</button>
         </nav>
 
@@ -156,6 +157,27 @@
               <button class="button secondary" id="refresh-services">Refresh</button>
             </div>
             <div id="services-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="settings-section" class="admin-section hidden">
+          <article class="card">
+            <h3>System Settings</h3>
+            <form id="settings-form" class="stack-form">
+              <label>
+                Shop Currency
+                <select name="currency" required>
+                  <option value="ZAR">ZAR</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </label>
+              <div class="section-header-row">
+                <button class="button primary" type="submit">Save Settings</button>
+                <button class="button secondary" type="button" id="refresh-settings">Refresh</button>
+              </div>
+              <p id="settings-message" class="subtext"></p>
+            </form>
           </article>
         </section>
 

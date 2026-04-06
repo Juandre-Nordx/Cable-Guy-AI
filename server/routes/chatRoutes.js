@@ -1,7 +1,7 @@
 const router = require('express').Router();
-const { chat, wizard } = require('../controllers/chatController');
+const { chat, wizardTree } = require('../controllers/chatController');
 
-router.post('/wizard', wizard);
+router.get('/wizard/tree', wizardTree);
 router.post('/', chat);
 
 module.exports = router;

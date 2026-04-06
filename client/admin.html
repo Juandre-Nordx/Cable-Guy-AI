@@ -21,6 +21,7 @@
           <button class="admin-nav-link" data-target="products-section">Products</button>
           <button class="admin-nav-link" data-target="kits-section">Kits</button>
           <button class="admin-nav-link" data-target="services-section">Services</button>
+          <button class="admin-nav-link" data-target="wizard-section">Wizard Builder</button>
         </nav>
 
         <button id="logout-button" class="button secondary">Logout</button>
@@ -155,6 +156,76 @@
               <button class="button secondary" id="refresh-services">Refresh</button>
             </div>
             <div id="services-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="wizard-section" class="admin-section hidden">
+          <article class="card">
+            <div class="section-header-row">
+              <h3>WIZARD BUILDER</h3>
+              <button class="button secondary" id="refresh-wizard">Refresh</button>
+            </div>
+            <p class="subtext">Build one connected decision tree used by the Cable Guy AI Wizard.</p>
+            <div class="wizard-builder-grid">
+              <aside class="wizard-panel">
+                <div class="section-header-row">
+                  <h4>Nodes</h4>
+                  <button class="button primary" id="wizard-add-node" type="button">Add Node</button>
+                </div>
+                <div id="wizard-node-list" class="wizard-node-list"></div>
+              </aside>
+
+              <section class="wizard-graph-panel">
+                <div class="section-header-row">
+                  <h4>Graph</h4>
+                  <button class="button secondary" id="wizard-connect-mode" type="button">Connect: Off</button>
+                </div>
+                <div id="wizard-graph" class="wizard-graph"></div>
+              </section>
+
+              <aside class="wizard-panel">
+                <h4>Edit Selected Node</h4>
+                <form id="wizard-node-form" class="stack-form">
+                  <input type="hidden" name="id" />
+                  <label>Title<input type="text" name="title" required /></label>
+                  <label>
+                    Type
+                    <select name="type">
+                      <option value="question">Question</option>
+                      <option value="result">Result</option>
+                    </select>
+                  </label>
+                  <label data-role="wizard-message-field">Message<textarea name="message" rows="3"></textarea></label>
+                  <label>Category<input type="text" name="category" placeholder="home, bridge, business..." /></label>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="needs_technician" />
+                    Needs technician
+                  </label>
+                  <div class="section-header-row">
+                    <button class="button primary" type="submit">Save Node</button>
+                    <button class="button secondary" id="wizard-delete-node" type="button">Delete Node</button>
+                  </div>
+                  <p id="wizard-node-message" class="subtext"></p>
+                </form>
+
+                <hr />
+                <h4>Add Connection</h4>
+                <form id="wizard-edge-form" class="stack-form">
+                  <label>Label<input type="text" name="label" placeholder="Yes / No / Fibre" required /></label>
+                  <label>
+                    Target Node
+                    <select name="to_node_id" id="wizard-edge-target" required></select>
+                  </label>
+                  <button class="button secondary" type="submit">Add Connection</button>
+                  <p id="wizard-edge-message" class="subtext"></p>
+                </form>
+                <div class="section-header-row mt-16">
+                  <h4>Existing Connections</h4>
+                  <span id="wizard-connection-count" class="subtext">0</span>
+                </div>
+                <div id="wizard-edge-list" class="wizard-edge-list"></div>
+              </aside>
+            </div>
           </article>
         </section>
       </main>

@@ -7,10 +7,6 @@ const {
   detectRecommendedKit
 } = require('../utils/ai');
 
-const WIZARD_PROBLEMS = ['wifi_coverage', 'slow_internet', 'between_buildings', 'security', 'other'];
-const WIZARD_PROPERTY_TYPES = ['small_home', 'large_home', 'office', 'multiple_buildings'];
-const WIZARD_DISTANCES = ['same_room', 'different_rooms', 'separate_building'];
-
 const systemPrompt = `You are Cable Guy AI, a professional network technician.
 
 You must:
@@ -65,59 +61,44 @@ async function callOllama(userMessage) {
   }
 }
 
-function mapWizardRecommendation({ problem, property_type, distance, self_install }) {
-  let recommendedCategory = 'home';
-
-  if (problem === 'security') {
-    recommendedCategory = 'security';
-  } else if (distance === 'separate_building' || property_type === 'multiple_buildings' || problem === 'between_buildings') {
-    recommendedCategory = 'bridge';
-  } else if (property_type === 'office') {
-    recommendedCategory = 'business';
-  }
-
-  const complexSetup =
-    recommendedCategory === 'bridge' ||
-    recommendedCategory === 'business' ||
-    property_type === 'large_home' ||
-    distance === 'separate_building';
-
-  const needsTechnician = !self_install || complexSetup;
-
-  const reasons = [];
-  if (recommendedCategory === 'bridge') reasons.push('long-distance or separate-building connectivity');
-  if (recommendedCategory === 'security') reasons.push('security monitoring needs');
-  if (recommendedCategory === 'business') reasons.push('office-grade network capacity');
-  if (recommendedCategory === 'home') reasons.push('home WiFi coverage optimization');
-
-  return {
-    recommendedCategory,
-    needsTechnician,
-    message: `Based on your answers, we recommend the ${recommendedCategory} kit for ${reasons[0]}.`
-  };
-}
-
-async function wizard(req, res) {
+async function wizardTree(_req, res) {
   try {
-    const { problem, property_type, distance, self_install } = req.body || {};
+    const [nodesResult, edgesResult] = await Promise.all([
+      query(
+        `
+        SELECT id, title, type, message, category, needs_technician
+        FROM wizard_nodes
+        ORDER BY id ASC;
+        `
+      ),
+      query(
+        `
+        SELECT id, from_node_id, to_node_id, label
+        FROM wizard_edges
+        ORDER BY id ASC;
+        `
+      )
+    ]);
 
-    if (
-      !WIZARD_PROBLEMS.includes(problem) ||
-      !WIZARD_PROPERTY_TYPES.includes(property_type) ||
-      !WIZARD_DISTANCES.includes(distance) ||
-      typeof self_install !== 'boolean'
-    ) {
-      return res.status(400).json({
+    const incoming = new Set(edgesResult.rows.map((edge) => edge.to_node_id));
+    const rootNodes = nodesResult.rows.filter((node) => !incoming.has(node.id));
+
+    if (!nodesResult.rows.length || !rootNodes.length) {
+      return res.status(409).json({
         success: false,
-        error: 'problem, property_type, distance, and self_install are required with valid values.'
+        error: 'Wizard tree is not configured correctly. Please define at least one root node.'
       });
     }
 
-    const recommendation = mapWizardRecommendation({ problem, property_type, distance, self_install });
-    return res.json({ success: true, ...recommendation });
+    return res.json({
+      success: true,
+      rootNodeId: rootNodes[0].id,
+      nodes: nodesResult.rows,
+      edges: edgesResult.rows
+    });
   } catch (error) {
-    console.error('[POST /chat/wizard] Failed:', error.message);
-    return res.status(500).json({ success: false, error: 'Failed to evaluate wizard answers.' });
+    console.error('[GET /chat/wizard/tree] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load wizard tree.' });
   }
 }
 
@@ -164,4 +145,4 @@ async function chat(req, res) {
   }
 }
 
-module.exports = { chat, wizard };
+module.exports = { chat, wizardTree };

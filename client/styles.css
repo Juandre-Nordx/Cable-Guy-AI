@@ -489,3 +489,116 @@ label {
     flex-wrap: wrap;
   }
 }
+
+.wizard-builder-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.wizard-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem;
+  background: #f8fafc;
+}
+
+.wizard-node-list,
+.wizard-edge-list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 500px;
+  overflow: auto;
+}
+
+.wizard-node-item {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+}
+
+.wizard-node-item.selected,
+.wizard-node-box.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.wizard-node-type {
+  font-size: 0.78rem;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.wizard-graph-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem;
+  background: #fff;
+}
+
+.wizard-graph {
+  position: relative;
+  min-height: 560px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  overflow: auto;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.wizard-graph svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.wizard-node-box {
+  position: absolute;
+  width: 180px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.wizard-node-box.question {
+  border-left: 5px solid #0284c7;
+}
+
+.wizard-node-box.result {
+  border-left: 5px solid #16a34a;
+}
+
+.wizard-edge-pill {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.wizard-edge-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.wizard-edge-edit input,
+.wizard-edge-edit select {
+  margin: 0;
+}
+
+@media (max-width: 1120px) {
+  .wizard-builder-grid {
+    grid-template-columns: 1fr;
+  }
+}

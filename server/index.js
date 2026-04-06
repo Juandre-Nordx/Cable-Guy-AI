@@ -20,6 +20,9 @@ if (!fs.existsSync(config.uploadDir)) {
 }
 
 app.use(cors());
+app.get('/health', (_req, res) => {
+  res.status(200).json({ success: true, status: 'ok' });
+});
 app.use(express.json({ limit: '128kb' }));
 app.use(config.uploadUrlBase, express.static(config.uploadDir));
 app.use(express.static(config.clientDir));

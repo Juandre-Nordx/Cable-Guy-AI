@@ -1,7 +1,7 @@
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
 const query = new URLSearchParams(window.location.search);
-const highlightedType = query.get('kit');
+const highlightedCategory = query.get('category');
 
 function escapeHtml(text = '') {
   return text
@@ -53,7 +53,7 @@ function renderStep(step) {
 
 function renderKit(kit) {
   const card = document.createElement('article');
-  card.className = `card kit-card ${highlightedType === kit.type ? 'recommended' : ''}`;
+  card.className = `card kit-card ${highlightedCategory === kit.category ? 'recommended' : ''}`;
 
   const embedUrl = toEmbedUrl(kit.video_url);
   const detailsId = `kit-details-${kit.id}`;
@@ -63,7 +63,7 @@ function renderKit(kit) {
     <p class="subtext">${kit.description}</p>
     <p class="guide-label">Easy Installation Guide Included</p>
     ${kit.requires_technician ? '<p class="warning">⚠️ Recommended: Professional Installation</p>' : ''}
-    <p><strong>Type:</strong> ${kit.type}</p>
+    <p><strong>Category:</strong> ${kit.category}</p>
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
     <p><strong>Price:</strong> $${Number(kit.price).toFixed(2)}</p>
     <div class="kit-card-actions">

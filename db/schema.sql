@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS kits (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL UNIQUE CHECK (type IN ('home', 'bridge', 'cctv', 'business')),
+  category TEXT NOT NULL CHECK (category IN ('home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart')),
   price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
   difficulty TEXT NOT NULL,
   requires_technician BOOLEAN NOT NULL DEFAULT FALSE,
@@ -40,6 +40,39 @@ CREATE TABLE IF NOT EXISTS kits (
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS instructions TEXT NOT NULL DEFAULT '';
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS video_url TEXT;
+
+-- Backward-safe migration for renamed kit field
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'kits' AND column_name = 'type'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'kits' AND column_name = 'category'
+  ) THEN
+    ALTER TABLE kits RENAME COLUMN type TO category;
+  END IF;
+END $$;
+
+-- Ensure category is not unique so multiple kits can share the same category
+ALTER TABLE kits DROP CONSTRAINT IF EXISTS kits_type_key;
+ALTER TABLE kits DROP CONSTRAINT IF EXISTS kits_category_key;
+
+-- Normalize legacy kit category/type values to the standardized category set
+UPDATE kits
+SET category = CASE
+  WHEN LOWER(category) IN ('home', 'wifi', 'mesh') THEN 'home'
+  WHEN LOWER(category) IN ('bridge', 'ptp') THEN 'bridge'
+  WHEN LOWER(category) IN ('cctv', 'camera') THEN 'security'
+  WHEN LOWER(category) IN ('ups', 'power') THEN 'backup'
+  WHEN LOWER(category) IN ('cabinet', 'pole', 'box') THEN 'infrastructure'
+  WHEN LOWER(category) = 'business' THEN 'business'
+  WHEN LOWER(category) = 'smart' THEN 'smart'
+  ELSE 'home'
+END;
 
 CREATE TABLE IF NOT EXISTS kit_steps (
   id SERIAL PRIMARY KEY,
@@ -95,11 +128,11 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-WITH seed_kits (name, type, price, difficulty, requires_technician, description) AS (
+WITH seed_kits (name, category, price, difficulty, requires_technician, description) AS (
   VALUES
     ('Home WiFi Kit', 'home', 199.99::numeric, 'easy', false, 'Dual-node mesh kit for apartments and homes with dead zones.'),
     ('Bridge Kit', 'bridge', 299.00::numeric, 'medium', true, 'Point-to-point bridge kit to connect detached buildings or garages.'),
-    ('CCTV Kit', 'cctv', 399.00::numeric, 'medium', true, 'CCTV package with NVR and PoE cameras for secure monitoring.'),
+    ('CCTV Kit', 'security', 399.00::numeric, 'medium', true, 'CCTV package with NVR and PoE cameras for secure monitoring.'),
     ('Business Network Kit', 'business', 549.00::numeric, 'medium', true, 'Router + managed switch + APs for multi-user environments.')
 ),
 updated AS (
@@ -111,14 +144,14 @@ updated AS (
     requires_technician = sk.requires_technician,
     description = sk.description
   FROM seed_kits sk
-  WHERE k.type = sk.type
-  RETURNING k.type
+  WHERE k.category = sk.category
+  RETURNING k.category
 )
-INSERT INTO kits (name, type, price, difficulty, requires_technician, description)
-SELECT sk.name, sk.type, sk.price, sk.difficulty, sk.requires_technician, sk.description
+INSERT INTO kits (name, category, price, difficulty, requires_technician, description)
+SELECT sk.name, sk.category, sk.price, sk.difficulty, sk.requires_technician, sk.description
 FROM seed_kits sk
 WHERE NOT EXISTS (
   SELECT 1
   FROM kits k
-  WHERE k.type = sk.type
+  WHERE k.category = sk.category
 );

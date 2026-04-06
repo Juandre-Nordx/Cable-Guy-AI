@@ -2,7 +2,7 @@ const { query } = require('../models/db');
 const { requiredString, validateEnum, validateNumber } = require('../middleware/validate');
 const { ORDER_STATUSES } = require('./orderController');
 
-const KIT_TYPES = ['home', 'bridge', 'cctv', 'business'];
+const KIT_CATEGORIES = ['home', 'bridge', 'backup', 'security', 'infrastructure', 'business', 'smart'];
 
 async function createProduct(req, res) {
   try {
@@ -87,30 +87,30 @@ async function deleteProduct(req, res) {
 
 async function createKit(req, res) {
   try {
-    const { name, type, price, difficulty, requires_technician, description, instructions, image_url, video_url } = req.body || {};
+    const { name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url } = req.body || {};
 
     if (
       !requiredString(name) ||
-      !validateEnum(type, KIT_TYPES) ||
+      !validateEnum(category, KIT_CATEGORIES) ||
       !validateNumber(price) ||
       !requiredString(difficulty) ||
       typeof requires_technician !== 'boolean'
     ) {
       return res.status(400).json({
         success: false,
-        error: 'name, valid type, price, difficulty, and requires_technician are required.'
+        error: 'name, valid category, price, difficulty, and requires_technician are required.'
       });
     }
 
     const result = await query(
       `
-      INSERT INTO kits (name, type, price, difficulty, requires_technician, description, instructions, image_url, video_url)
+      INSERT INTO kits (name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *;
       `,
       [
         name.trim(),
-        type,
+        category,
         price,
         difficulty.trim(),
         requires_technician,
@@ -124,7 +124,7 @@ async function createKit(req, res) {
     return res.status(201).json({ success: true, kit: result.rows[0] });
   } catch (error) {
     if (error.code === '23505') {
-      return res.status(409).json({ success: false, error: 'Kit type already exists.' });
+      return res.status(409).json({ success: false, error: 'Kit category already exists.' });
     }
     console.error('[POST /admin/kit] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to create kit.' });

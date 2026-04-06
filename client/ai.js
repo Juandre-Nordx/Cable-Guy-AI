@@ -35,7 +35,7 @@ function renderKitCard(kit) {
     <h3>${kit.name}</h3>
     <p class="subtext">${kit.description || 'AI recommended this kit based on your diagnosis.'}</p>
     <p><strong>Price:</strong> ${kit.price ? `$${Number(kit.price).toFixed(2)}` : 'See store'}</p>
-    <a class="button secondary" href="/store.html?kit=${encodeURIComponent(kit.type || '')}">View Kit</a>
+    <a class="button secondary" href="/store.html?category=${encodeURIComponent(kit.category || '')}">View Kit</a>
   `;
 
   chatContainer.appendChild(card);
@@ -68,11 +68,11 @@ function renderTechnicianPrompt(message = 'This issue may require onsite setup o
 }
 
 function renderWizardResult(payload) {
-  const viewKitLink = `/store.html?kit=${encodeURIComponent(payload.recommendedKitType)}`;
+  const viewKitLink = `/store.html?category=${encodeURIComponent(payload.recommendedCategory)}`;
 
   wizardResult.classList.remove('hidden');
   wizardResult.innerHTML = `
-    <h3>Recommended Kit: ${payload.recommendedKitType}</h3>
+    <h3>Recommended Category: ${payload.recommendedCategory}</h3>
     <p class="subtext">${payload.message}</p>
     ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : ''}
     <div class="kit-card-actions">
@@ -83,7 +83,7 @@ function renderWizardResult(payload) {
 
   document.getElementById('continue-chat')?.addEventListener('click', () => {
     chatShell.classList.remove('hidden');
-    const starter = `Wizard context: problem=${payload.problem}, property=${payload.property_type}, distance=${payload.distance}, self_install=${payload.self_install}. Please provide deeper setup guidance for a ${payload.recommendedKitType} kit.`;
+    const starter = `Wizard context: problem=${payload.problem}, property=${payload.property_type}, distance=${payload.distance}, self_install=${payload.self_install}. Please provide deeper setup guidance for a ${payload.recommendedCategory} kit.`;
     if (!chatContainer.childElementCount) {
       renderMessage('Hi, I am Cable Guy AI. Tell me what is happening with your WiFi and I will guide your diagnosis.', 'ai');
     }

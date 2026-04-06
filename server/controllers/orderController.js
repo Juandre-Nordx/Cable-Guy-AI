@@ -36,7 +36,7 @@ async function listMyOrders(req, res) {
   try {
     const result = await query(
       `
-      SELECT o.*, k.name AS kit_name, k.type AS kit_type, k.price AS kit_price
+      SELECT o.*, k.name AS kit_name, k.category AS kit_category, k.price AS kit_price
       FROM orders o
       LEFT JOIN kits k ON k.id = o.kit_id
       WHERE o.user_id = $1
@@ -67,7 +67,7 @@ async function listAllOrders(req, res) {
         u.contact_number AS customer_contact_number,
         u.address AS customer_address,
         k.name AS kit_name,
-        k.type AS kit_type
+        k.category AS kit_category
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_id
       LEFT JOIN kits k ON k.id = o.kit_id

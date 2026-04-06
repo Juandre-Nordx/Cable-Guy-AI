@@ -94,13 +94,18 @@ async function updateOrderStatus(req, res) {
       });
     }
 
-    const result = await query('UPDATE orders SET status = $2 WHERE id = $1 RETURNING *;', [id, status]);
-
-    if (!result.rows[0]) {
+    const existingResult = await query('SELECT id, status FROM orders WHERE id = $1;', [id]);
+    const existing = existingResult.rows[0];
+    if (!existing) {
       return res.status(404).json({ success: false, error: 'Order not found.' });
     }
 
-    return res.json({ success: true, message: 'Order status updated.', order: result.rows[0] });
+    if (existing.status === 'done') {
+      return res.status(409).json({ success: false, error: 'Order is already completed and cannot be updated.' });
+    }
+
+    const result = await query('UPDATE orders SET status = $2 WHERE id = $1 RETURNING *;', [id, status]);
+    return res.json({ success: true, message: status === 'done' ? 'Order Completed' : 'Order status updated.', order: result.rows[0] });
   } catch (error) {
     console.error('[PUT /admin/orders/:id] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to update order status.' });

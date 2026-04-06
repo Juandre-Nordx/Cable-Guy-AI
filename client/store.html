@@ -33,6 +33,26 @@
       </section>
     </main>
 
+    <div id="order-flow-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="order-flow-title">
+      <div class="modal-card">
+        <h3 id="order-flow-title">How Your Order Works</h3>
+        <ol class="order-flow-list">
+          <li>You place your order.</li>
+          <li>We review your request and select the correct kit.</li>
+          <li>We contact you to confirm if you need pre-configuration or support.</li>
+          <li>We send you a final invoice with a secure payment link.</li>
+          <li>Once payment is received, we ship your order based on your selected delivery method.</li>
+        </ol>
+        <p class="card order-flow-note">
+          <strong>Important:</strong> Please keep an eye on the Notes section of your order. Our team may send updates or ask questions, and you can reply directly there.
+        </p>
+        <div class="kit-card-actions">
+          <button id="confirm-order-flow" class="button primary" type="button">Confirm &amp; Place Order</button>
+          <button id="cancel-order-flow" class="button secondary" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <script src="/auth.js"></script>
     <script src="/store.js"></script>
   </body>

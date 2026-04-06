@@ -12,6 +12,8 @@ const {
   createService,
   listUsers,
   dashboard,
+  getAdminSettings,
+  updateAdminSettings,
   uploadImage,
   listWizardNodes,
   createWizardNode,
@@ -57,6 +59,8 @@ router.get('/orders', listAllOrders);
 router.put('/orders/:id', updateOrderStatus);
 router.post('/orders/:id/note', createAdminOrderNote);
 router.get('/dashboard', dashboard);
+router.get('/settings', getAdminSettings);
+router.put('/settings', updateAdminSettings);
 
 router.post('/product', createProduct);
 router.put('/product/:id', updateProduct);

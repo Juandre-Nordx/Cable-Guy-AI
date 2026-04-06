@@ -2,6 +2,18 @@ function getToken() {
   return localStorage.getItem('token') || '';
 }
 
+function isLoggedIn() {
+  return !!localStorage.getItem('token');
+}
+
+function requireStoreAccess() {
+  if (!isLoggedIn()) {
+    window.location.href = '/login.html';
+    return false;
+  }
+  return true;
+}
+
 function getUser() {
   const raw = localStorage.getItem('user');
   if (!raw) return null;

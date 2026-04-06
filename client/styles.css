@@ -553,7 +553,8 @@ label {
   inset: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  pointer-events: auto;
+  z-index: 0;
 }
 
 .wizard-node-box {
@@ -564,6 +565,7 @@ label {
   background: #fff;
   padding: 0.5rem;
   cursor: pointer;
+  z-index: 1;
 }
 
 .wizard-node-box.question {
@@ -595,6 +597,32 @@ label {
 .wizard-edge-edit input,
 .wizard-edge-edit select {
   margin: 0;
+}
+
+.wizard-edge-edit.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+}
+
+.wizard-edge-line {
+  cursor: pointer;
+}
+
+.wizard-edge-line line,
+.wizard-edge-line text {
+  transition: 120ms ease;
+}
+
+.wizard-edge-line:hover line,
+.wizard-edge-line.selected line {
+  stroke: #2563eb;
+  stroke-width: 3;
+}
+
+.wizard-edge-line:hover text,
+.wizard-edge-line.selected text {
+  fill: #1d4ed8;
+  font-weight: 600;
 }
 
 @media (max-width: 1120px) {

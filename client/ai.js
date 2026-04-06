@@ -84,20 +84,14 @@ function renderWizardResult(payload) {
     <p class="subtext">${payload.message}</p>
     ${payload.needsTechnician ? '<p class="warning">⚠️ We recommend booking a technician</p>' : '<p class="success">✅ No onsite technician required.</p>'}
     <div class="kit-card-actions">
-      <a class="button secondary" href="${viewKitLink}">View Kit</a>
-      <button id="continue-chat" class="button primary" type="button">Continue with AI Assistant</button>
+      <a class="button secondary" href="${viewKitLink}">Visit Store</a>
+      <button id="book-teck" class="button primary" type="button">Book a teck</button>
     </div>
   `;
 
-  document.getElementById('continue-chat')?.addEventListener('click', () => {
-    chatShell.classList.remove('hidden');
-    const starter = `Wizard context: ${payload.message}. Category=${payload.category || 'general'}, needs_technician=${payload.needsTechnician}. Please provide deeper setup guidance.`;
-    if (!chatContainer.childElementCount) {
-      renderMessage('Hi, I am Cable Guy AI. Tell me what is happening with your WiFi and I will guide your diagnosis.', 'ai');
-    }
-    renderMessage(starter, 'user');
-    input.value = starter;
-    chatShell.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('book-teck')?.addEventListener('click', () => {
+    bookingSection.classList.remove('hidden');
+    bookingSection.scrollIntoView({ behavior: 'smooth' });
   });
 }
 

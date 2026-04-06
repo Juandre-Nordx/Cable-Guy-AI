@@ -2,6 +2,8 @@ const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
 const serviceGrid = document.getElementById('service-grid');
 const orderPopup = document.getElementById('orderPopup');
+const detailsModal = document.getElementById('detailsModal');
+const detailsModalBody = document.getElementById('details-modal-body');
 const query = new URLSearchParams(window.location.search);
 const highlightedCategory = query.get('category');
 const highlightedProductId = Number(query.get('product_id') || 0);
@@ -62,9 +64,6 @@ function renderKit(kit) {
   card.className = `card kit-card ${highlightedCategory === kit.category || highlightedKitId === kit.id ? 'recommended' : ''}`;
   card.id = `kit-card-${kit.id}`;
 
-  const embedUrl = toEmbedUrl(kit.video_url);
-  const detailsId = `kit-details-${kit.id}`;
-
   card.innerHTML = `
     <h2>${kit.name}</h2>
     <p class="subtext">${kit.description}</p>
@@ -74,16 +73,9 @@ function renderKit(kit) {
     <p><strong>Difficulty:</strong> ${kit.difficulty}</p>
     <p><strong>Price:</strong> ${formatCurrency(kit.price, kit.currency)}</p>
     <div class="kit-card-actions">
-      <button class="button secondary view-details-btn" type="button" data-id="${kit.id}" data-toggle-details="${detailsId}">View Details</button>
+      <button class="button secondary view-details-btn" type="button" data-id="${kit.id}">View Details</button>
       <button class="button primary place-order-btn" type="button" data-id="${kit.id}" data-kit-name="${escapeHtml(kit.name)}">Place Order</button>
     </div>
-    <section id="${detailsId}" class="kit-details hidden">
-      ${kit.image_url ? `<img src="${kit.image_url}" alt="${kit.name}" class="kit-main-image" loading="lazy" />` : ''}
-      <h4>Installation Guide</h4>
-      ${formatInstructions(kit.instructions || '')}
-      ${Array.isArray(kit.steps) && kit.steps.length ? `<div class="kit-steps"><h4>Step-by-Step</h4>${kit.steps.map(renderStep).join('')}</div>` : ''}
-      ${embedUrl ? `<div class="kit-video"><h4>Video</h4><iframe src="${embedUrl}" title="${kit.name} installation video" loading="lazy" allowfullscreen></iframe></div>` : ''}
-    </section>
   `;
 
   return card;
@@ -164,6 +156,35 @@ function closeOrderPopup() {
   lockBodyScroll(false);
 }
 
+function openDetailsModal(kit) {
+  if (!detailsModal || !detailsModalBody) return;
+
+  const embedUrl = toEmbedUrl(kit.video_url);
+  const steps = Array.isArray(kit.steps) ? kit.steps : [];
+  const safeName = escapeHtml(kit.name || 'Kit');
+
+  detailsModalBody.innerHTML = `
+    ${kit.image_url ? `<img src="${kit.image_url}" alt="${safeName}" class="kit-main-image" loading="lazy" />` : ''}
+    <h4>${safeName}</h4>
+    <p class="subtext">${escapeHtml(kit.description || '')}</p>
+    <h4>Instructions</h4>
+    ${formatInstructions(kit.instructions || '')}
+    ${steps.length ? `<div class="kit-steps"><h4>Step-by-Step</h4>${steps.map(renderStep).join('')}</div>` : ''}
+    ${embedUrl ? `<div class="kit-video"><h4>Video</h4><iframe src="${embedUrl}" title="${safeName} installation video" loading="lazy" allowfullscreen></iframe></div>` : ''}
+  `;
+
+  detailsModal.classList.remove('hidden');
+  detailsModal.classList.add('open');
+  lockBodyScroll(true);
+}
+
+function closeDetailsModal() {
+  if (!detailsModal) return;
+  detailsModal.classList.add('hidden');
+  detailsModal.classList.remove('open');
+  lockBodyScroll(!orderPopup?.classList.contains('hidden'));
+}
+
 function highlightRequestedItems() {
   const targets = [];
   if (highlightedProductId > 0) targets.push(document.getElementById(`product-card-${highlightedProductId}`));
@@ -217,11 +238,7 @@ async function placeOrder(kitId, kitName) {
   }
 }
 
-async function handlePlaceOrder(event) {
-  event.preventDefault();
-  console.log('Button clicked');
-
-  const button = event.currentTarget;
+async function handlePlaceOrder(button) {
   const id = Number(button?.dataset.id || 0);
   const kitName = button?.dataset.kitName || 'your kit';
 
@@ -234,70 +251,38 @@ async function handlePlaceOrder(event) {
   await withButtonLoading(button, 'Processing...', () => placeOrder(id, kitName));
 }
 
-async function handleViewDetails(event) {
-  event.preventDefault();
-  console.log('Button clicked');
-
-  const button = event.currentTarget;
-  const id = button?.dataset.id;
-  const detailsId = button?.dataset.toggleDetails;
+async function handleViewDetails(button) {
+  const id = Number(button?.dataset.id || 0);
 
   console.log('View details clicked:', id);
 
   try {
-    if (!detailsId) {
-      window.location.href = `/product.html?id=${encodeURIComponent(id || '')}`;
-      return;
+    if (!id) {
+      throw new Error('Missing kit id for details.');
     }
 
-    const details = document.getElementById(detailsId);
-    const isHidden = details?.classList.contains('hidden');
-    details?.classList.toggle('hidden', !isHidden);
-    button.textContent = isHidden ? 'Hide Details' : 'View Details';
-    details?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const response = await fetch(`/kits/${id}`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Unable to load kit details.');
+    }
+
+    openDetailsModal(payload.kit);
   } catch (error) {
     console.error('View details error:', error);
   }
 }
 
 function wirePopupControls() {
-  if (!orderPopup) return;
-
-  const confirmButton = document.getElementById('confirm-order-flow');
-  const cancelButton = document.getElementById('cancel-order-flow');
-  const closeButton = document.getElementById('close-order-popup');
-
-  confirmButton?.addEventListener('click', () => {
-    closeOrderPopup();
-    window.location.href = '/dashboard.html';
-  });
-  cancelButton?.addEventListener('click', closeOrderPopup);
-  closeButton?.addEventListener('click', closeOrderPopup);
-
-  orderPopup.addEventListener('click', (event) => {
-    if (event.target === orderPopup) {
-      closeOrderPopup();
-    }
-  });
-
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !orderPopup.classList.contains('hidden')) {
+    if (event.key === 'Escape' && orderPopup && !orderPopup.classList.contains('hidden')) {
       closeOrderPopup();
     }
-  });
-}
 
-function bindStoreButtonEvents() {
-  document.querySelectorAll('.place-order-btn').forEach((button) => {
-    if (button.dataset.bound === 'true') return;
-    button.addEventListener('click', handlePlaceOrder);
-    button.dataset.bound = 'true';
-  });
-
-  document.querySelectorAll('.view-details-btn').forEach((button) => {
-    if (button.dataset.bound === 'true') return;
-    button.addEventListener('click', handleViewDetails);
-    button.dataset.bound = 'true';
+    if (event.key === 'Escape' && detailsModal && !detailsModal.classList.contains('hidden')) {
+      closeDetailsModal();
+    }
   });
 }
 
@@ -319,7 +304,6 @@ async function loadKits() {
     payload.kits.forEach((kit) => {
       kitGrid.appendChild(renderKit(kit));
     });
-    bindStoreButtonEvents();
     highlightRequestedItems();
   } catch (error) {
     console.error('[Store] Kits load failed:', error.message);
@@ -385,4 +369,55 @@ document.addEventListener('DOMContentLoaded', () => {
   loadServices();
   wirePopupControls();
   closeOrderPopup();
+  closeDetailsModal();
+});
+
+document.addEventListener('click', async (event) => {
+  console.log('CLICK DETECTED');
+
+  const viewBtn = event.target.closest('.view-details-btn');
+  const orderBtn = event.target.closest('.place-order-btn');
+  const cancelOrderBtn = event.target.closest('#cancel-order-flow, #close-order-popup');
+  const confirmOrderBtn = event.target.closest('#confirm-order-flow');
+  const closeDetailsBtn = event.target.closest('#close-details-modal, #cancel-details-modal');
+
+  if (viewBtn) {
+    event.preventDefault();
+    await handleViewDetails(viewBtn);
+    return;
+  }
+
+  if (orderBtn) {
+    event.preventDefault();
+    await handlePlaceOrder(orderBtn);
+    return;
+  }
+
+  if (cancelOrderBtn) {
+    event.preventDefault();
+    closeOrderPopup();
+    return;
+  }
+
+  if (confirmOrderBtn) {
+    event.preventDefault();
+    closeOrderPopup();
+    window.location.href = '/dashboard.html';
+    return;
+  }
+
+  if (closeDetailsBtn) {
+    event.preventDefault();
+    closeDetailsModal();
+    return;
+  }
+
+  if (event.target === orderPopup) {
+    closeOrderPopup();
+    return;
+  }
+
+  if (event.target === detailsModal) {
+    closeDetailsModal();
+  }
 });

@@ -134,6 +134,33 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS wizard_nodes (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('question', 'result')),
+  message TEXT NOT NULL DEFAULT '',
+  category TEXT,
+  needs_technician BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS wizard_edges (
+  id SERIAL PRIMARY KEY,
+  from_node_id INTEGER NOT NULL REFERENCES wizard_nodes(id) ON DELETE CASCADE,
+  to_node_id INTEGER NOT NULL REFERENCES wizard_nodes(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT wizard_edges_no_self_loop CHECK (from_node_id <> to_node_id),
+  CONSTRAINT wizard_edges_unique_choice UNIQUE (from_node_id, label)
+);
+
+CREATE INDEX IF NOT EXISTS wizard_edges_from_idx ON wizard_edges(from_node_id);
+CREATE INDEX IF NOT EXISTS wizard_edges_to_idx ON wizard_edges(to_node_id);
+
+INSERT INTO wizard_nodes (title, type, message, category, needs_technician)
+SELECT 'What network issue are you facing?', 'question', '', NULL, false
+WHERE NOT EXISTS (SELECT 1 FROM wizard_nodes);
+
 WITH seed_kits (name, category, price, difficulty, requires_technician, description) AS (
   VALUES
     ('Home WiFi Kit', 'home', 199.99::numeric, 'easy', false, 'Dual-node mesh kit for apartments and homes with dead zones.'),

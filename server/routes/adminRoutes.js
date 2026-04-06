@@ -12,7 +12,14 @@ const {
   createService,
   listUsers,
   dashboard,
-  uploadImage
+  uploadImage,
+  listWizardNodes,
+  createWizardNode,
+  updateWizardNode,
+  deleteWizardNode,
+  listWizardEdges,
+  createWizardEdge,
+  deleteWizardEdge
 } = require('../controllers/adminController');
 const { listAllOrders, updateOrderStatus, createAdminOrderNote } = require('../controllers/orderController');
 
@@ -56,5 +63,12 @@ router.delete('/product/:id', deleteProduct);
 router.post('/kit', createKit);
 router.post('/service', createService);
 router.post('/upload', upload.single('image'), uploadImage);
+router.get('/wizard/nodes', listWizardNodes);
+router.post('/wizard/node', createWizardNode);
+router.put('/wizard/node/:id', updateWizardNode);
+router.delete('/wizard/node/:id', deleteWizardNode);
+router.get('/wizard/edges', listWizardEdges);
+router.post('/wizard/edge', createWizardEdge);
+router.delete('/wizard/edge/:id', deleteWizardEdge);
 
 module.exports = router;

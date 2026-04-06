@@ -10,7 +10,14 @@ const state = {
   orders: [],
   products: [],
   kits: [],
-  services: []
+  services: [],
+  wizard: {
+    nodes: [],
+    edges: [],
+    selectedNodeId: null,
+    connectMode: false,
+    connectSourceId: null
+  }
 };
 
 if (session) {
@@ -31,17 +38,24 @@ function bindLayoutEvents() {
   document.getElementById('refresh-products').addEventListener('click', loadProducts);
   document.getElementById('refresh-kits').addEventListener('click', loadKits);
   document.getElementById('refresh-services').addEventListener('click', loadServices);
+  document.getElementById('refresh-wizard').addEventListener('click', loadWizardBuilder);
+  document.getElementById('wizard-add-node').addEventListener('click', createWizardNodeDraft);
+  document.getElementById('wizard-connect-mode').addEventListener('click', toggleWizardConnectMode);
 }
 
 function bindFormEvents() {
   document.getElementById('product-form').addEventListener('submit', submitProduct);
   document.getElementById('kit-form').addEventListener('submit', submitKit);
   document.getElementById('service-form').addEventListener('submit', submitService);
+  document.getElementById('wizard-node-form').addEventListener('submit', submitWizardNode);
+  document.getElementById('wizard-delete-node').addEventListener('click', deleteWizardNodeBySelection);
+  document.getElementById('wizard-edge-form').addEventListener('submit', submitWizardEdge);
+  document.querySelector('#wizard-node-form select[name="type"]').addEventListener('change', toggleWizardResultFields);
 }
 
 async function bootAdmin() {
   try {
-    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices()]);
+    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadWizardBuilder()]);
     setGlobalMessage('Admin dashboard loaded.', 'success');
   } catch (error) {
     console.error('[Admin] boot failed:', error);
@@ -459,6 +473,373 @@ function renderServicesTable() {
   document.getElementById('services-table-wrap').innerHTML = state.services.length
     ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No services found.</p>';
+}
+
+async function loadWizardBuilder() {
+  const [nodesPayload, edgesPayload] = await Promise.all([apiFetch('/admin/wizard/nodes'), apiFetch('/admin/wizard/edges')]);
+  state.wizard.nodes = nodesPayload.nodes || [];
+  state.wizard.edges = edgesPayload.edges || [];
+
+  if (!state.wizard.nodes.some((node) => node.id === state.wizard.selectedNodeId)) {
+    state.wizard.selectedNodeId = state.wizard.nodes[0]?.id || null;
+  }
+
+  renderWizardBuilder();
+}
+
+function renderWizardBuilder() {
+  renderWizardNodeList();
+  renderWizardGraph();
+  renderWizardNodeEditor();
+  renderWizardEdgeEditor();
+  updateWizardConnectModeButton();
+}
+
+function renderWizardNodeList() {
+  const list = document.getElementById('wizard-node-list');
+  if (!state.wizard.nodes.length) {
+    list.innerHTML = '<p class="subtext">No nodes yet.</p>';
+    return;
+  }
+
+  list.innerHTML = state.wizard.nodes
+    .map(
+      (node) => `
+      <button type="button" class="wizard-node-item ${node.id === state.wizard.selectedNodeId ? 'selected' : ''}" data-wizard-node="${node.id}">
+        <strong>${escapeHtml(node.title)}</strong>
+        <div class="wizard-node-type">${node.type} #${node.id}</div>
+      </button>
+    `
+    )
+    .join('');
+
+  document.querySelectorAll('[data-wizard-node]').forEach((button) => {
+    button.addEventListener('click', () => {
+      handleWizardNodeClick(Number(button.dataset.wizardNode));
+    });
+  });
+}
+
+function renderWizardNodeEditor() {
+  const form = document.getElementById('wizard-node-form');
+  const node = state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId);
+  const messageLabel = form.querySelector('[data-role="wizard-message-field"]');
+
+  if (!node) {
+    form.reset();
+    form.elements.id.value = '';
+    messageLabel.classList.remove('hidden');
+    return;
+  }
+
+  form.elements.id.value = String(node.id);
+  form.elements.title.value = node.title || '';
+  form.elements.type.value = node.type || 'question';
+  form.elements.message.value = node.message || '';
+  form.elements.category.value = node.category || '';
+  form.elements.needs_technician.checked = Boolean(node.needs_technician);
+  toggleWizardResultFields();
+}
+
+function renderWizardEdgeEditor() {
+  const node = state.wizard.nodes.find((entry) => entry.id === state.wizard.selectedNodeId);
+  const targetSelect = document.getElementById('wizard-edge-target');
+  const edgeList = document.getElementById('wizard-edge-list');
+
+  const options = state.wizard.nodes
+    .filter((entry) => entry.id !== state.wizard.selectedNodeId)
+    .map((entry) => `<option value="${entry.id}">${escapeHtml(entry.title)} (#${entry.id})</option>`)
+    .join('');
+
+  targetSelect.innerHTML = options || '<option value="">No target nodes</option>';
+
+  if (!node) {
+    edgeList.innerHTML = '<p class="subtext">Select a node to edit connections.</p>';
+    return;
+  }
+
+  const outgoing = state.wizard.edges.filter((edge) => edge.from_node_id === node.id);
+  if (!outgoing.length) {
+    edgeList.innerHTML = '<p class="subtext">No outgoing connections yet.</p>';
+    return;
+  }
+
+  edgeList.innerHTML = outgoing
+    .map((edge) => {
+      const target = state.wizard.nodes.find((entry) => entry.id === edge.to_node_id);
+      return `
+      <div class="wizard-edge-pill">
+        <span>${escapeHtml(edge.label)} → ${escapeHtml(target?.title || `Node ${edge.to_node_id}`)}</span>
+        <button class="button secondary" type="button" data-delete-edge="${edge.id}">Delete</button>
+      </div>
+    `;
+    })
+    .join('');
+
+  document.querySelectorAll('[data-delete-edge]').forEach((button) => {
+    button.addEventListener('click', () => deleteWizardEdge(Number(button.dataset.deleteEdge)));
+  });
+}
+
+function renderWizardGraph() {
+  const graph = document.getElementById('wizard-graph');
+  if (!state.wizard.nodes.length) {
+    graph.innerHTML = '<p class="subtext">Create your first node to start building the tree.</p>';
+    return;
+  }
+
+  const layout = computeWizardLayout();
+  const nodeBoxes = state.wizard.nodes
+    .map((node) => {
+      const position = layout.get(node.id) || { x: 20, y: 20 };
+      return `
+        <button
+          type="button"
+          class="wizard-node-box ${node.type} ${node.id === state.wizard.selectedNodeId ? 'selected' : ''}"
+          style="left:${position.x}px; top:${position.y}px;"
+          data-wizard-graph-node="${node.id}"
+        >
+          <strong>${escapeHtml(node.title)}</strong>
+          <div class="wizard-node-type">${node.type}</div>
+        </button>
+      `;
+    })
+    .join('');
+
+  const edgeLines = state.wizard.edges
+    .map((edge) => {
+      const from = layout.get(edge.from_node_id);
+      const to = layout.get(edge.to_node_id);
+      if (!from || !to) return '';
+      const x1 = from.x + 180;
+      const y1 = from.y + 35;
+      const x2 = to.x;
+      const y2 = to.y + 35;
+      const labelX = (x1 + x2) / 2;
+      const labelY = (y1 + y2) / 2 - 6;
+      return `
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#334155" stroke-width="2"></line>
+        <text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="11" text-anchor="middle">${escapeHtml(edge.label)}</text>
+      `;
+    })
+    .join('');
+
+  graph.innerHTML = `
+    <svg viewBox="0 0 1500 1200" preserveAspectRatio="none">${edgeLines}</svg>
+    ${nodeBoxes}
+  `;
+
+  document.querySelectorAll('[data-wizard-graph-node]').forEach((button) => {
+    button.addEventListener('click', () => handleWizardNodeClick(Number(button.dataset.wizardGraphNode)));
+  });
+}
+
+function computeWizardLayout() {
+  const outgoingMap = new Map();
+  const incomingCount = new Map(state.wizard.nodes.map((node) => [node.id, 0]));
+
+  for (const edge of state.wizard.edges) {
+    if (!outgoingMap.has(edge.from_node_id)) outgoingMap.set(edge.from_node_id, []);
+    outgoingMap.get(edge.from_node_id).push(edge.to_node_id);
+    incomingCount.set(edge.to_node_id, (incomingCount.get(edge.to_node_id) || 0) + 1);
+  }
+
+  const roots = state.wizard.nodes.filter((node) => (incomingCount.get(node.id) || 0) === 0).map((node) => node.id);
+  const queue = roots.length ? [...roots] : [state.wizard.nodes[0].id];
+  const depth = new Map(queue.map((id) => [id, 0]));
+
+  while (queue.length) {
+    const currentId = queue.shift();
+    const nextDepth = (depth.get(currentId) || 0) + 1;
+    for (const nextId of outgoingMap.get(currentId) || []) {
+      if (!depth.has(nextId) || nextDepth < depth.get(nextId)) {
+        depth.set(nextId, nextDepth);
+        queue.push(nextId);
+      }
+    }
+  }
+
+  for (const node of state.wizard.nodes) {
+    if (!depth.has(node.id)) depth.set(node.id, 0);
+  }
+
+  const columns = new Map();
+  for (const node of state.wizard.nodes) {
+    const column = depth.get(node.id) || 0;
+    if (!columns.has(column)) columns.set(column, []);
+    columns.get(column).push(node.id);
+  }
+
+  const layout = new Map();
+  const sortedColumns = Array.from(columns.keys()).sort((a, b) => a - b);
+  for (const column of sortedColumns) {
+    const ids = columns.get(column);
+    ids.forEach((id, rowIndex) => {
+      layout.set(id, { x: 30 + column * 240, y: 30 + rowIndex * 110 });
+    });
+  }
+
+  return layout;
+}
+
+function handleWizardNodeClick(nodeId) {
+  if (state.wizard.connectMode) {
+    if (!state.wizard.connectSourceId) {
+      state.wizard.connectSourceId = nodeId;
+      setFormMessage('wizard-edge-message', `Connection source selected: node #${nodeId}. Now click the target node.`, 'subtext');
+      return;
+    }
+
+    if (state.wizard.connectSourceId === nodeId) {
+      setFormMessage('wizard-edge-message', 'Choose a different target node.', 'warning');
+      return;
+    }
+
+    const label = window.prompt('Connection label (example: Yes, No, Fibre):');
+    if (!label?.trim()) return;
+
+    createWizardEdge({ from_node_id: state.wizard.connectSourceId, to_node_id: nodeId, label: label.trim() });
+    state.wizard.connectSourceId = null;
+    return;
+  }
+
+  state.wizard.selectedNodeId = nodeId;
+  renderWizardBuilder();
+}
+
+function toggleWizardConnectMode() {
+  state.wizard.connectMode = !state.wizard.connectMode;
+  state.wizard.connectSourceId = null;
+  updateWizardConnectModeButton();
+  setFormMessage('wizard-edge-message', state.wizard.connectMode ? 'Connect mode enabled. Click source node then target node.' : '', 'subtext');
+}
+
+function updateWizardConnectModeButton() {
+  const button = document.getElementById('wizard-connect-mode');
+  button.textContent = `Connect: ${state.wizard.connectMode ? 'On' : 'Off'}`;
+  button.classList.toggle('primary', state.wizard.connectMode);
+  button.classList.toggle('secondary', !state.wizard.connectMode);
+}
+
+function toggleWizardResultFields() {
+  const form = document.getElementById('wizard-node-form');
+  const isResult = form.elements.type.value === 'result';
+  form.querySelector('[data-role="wizard-message-field"]').classList.toggle('hidden', !isResult);
+}
+
+function createWizardNodeDraft() {
+  const form = document.getElementById('wizard-node-form');
+  form.reset();
+  form.elements.id.value = '';
+  form.elements.type.value = 'question';
+  toggleWizardResultFields();
+  state.wizard.selectedNodeId = null;
+  renderWizardBuilder();
+}
+
+async function submitWizardNode(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const id = Number(form.elements.id.value || 0);
+  const payload = {
+    title: form.elements.title.value.trim(),
+    type: form.elements.type.value,
+    message: form.elements.message.value.trim(),
+    category: form.elements.category.value.trim() || null,
+    needs_technician: form.elements.needs_technician.checked
+  };
+
+  try {
+    if (id) {
+      await apiFetch(`/admin/wizard/node/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setFormMessage('wizard-node-message', 'Node updated.', 'success');
+    } else {
+      const response = await apiFetch('/admin/wizard/node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      state.wizard.selectedNodeId = response.node.id;
+      setFormMessage('wizard-node-message', 'Node created.', 'success');
+    }
+
+    await loadWizardBuilder();
+  } catch (error) {
+    setFormMessage('wizard-node-message', error.message, 'warning');
+  }
+}
+
+async function deleteWizardNodeBySelection() {
+  const nodeId = state.wizard.selectedNodeId;
+  if (!nodeId) {
+    setFormMessage('wizard-node-message', 'Select a node first.', 'warning');
+    return;
+  }
+
+  if (!window.confirm(`Delete node #${nodeId}? Related connections will be removed.`)) return;
+
+  try {
+    await apiFetch(`/admin/wizard/node/${nodeId}`, { method: 'DELETE' });
+    state.wizard.selectedNodeId = null;
+    setFormMessage('wizard-node-message', 'Node deleted.', 'success');
+    await loadWizardBuilder();
+  } catch (error) {
+    setFormMessage('wizard-node-message', error.message, 'warning');
+  }
+}
+
+async function submitWizardEdge(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const fromNodeId = state.wizard.selectedNodeId;
+  const toNodeId = Number(form.elements.to_node_id.value);
+  const label = form.elements.label.value.trim();
+
+  if (!fromNodeId) {
+    setFormMessage('wizard-edge-message', 'Select a source node first.', 'warning');
+    return;
+  }
+
+  await createWizardEdge({ from_node_id: fromNodeId, to_node_id: toNodeId, label });
+  form.reset();
+}
+
+async function createWizardEdge(payload) {
+  try {
+    await apiFetch('/admin/wizard/edge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    setFormMessage('wizard-edge-message', 'Connection created.', 'success');
+    await loadWizardBuilder();
+  } catch (error) {
+    setFormMessage('wizard-edge-message', error.message, 'warning');
+  }
+}
+
+async function deleteWizardEdge(edgeId) {
+  try {
+    await apiFetch(`/admin/wizard/edge/${edgeId}`, { method: 'DELETE' });
+    setFormMessage('wizard-edge-message', 'Connection deleted.', 'success');
+    await loadWizardBuilder();
+  } catch (error) {
+    setFormMessage('wizard-edge-message', error.message, 'warning');
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function setGlobalMessage(message, style = 'subtext') {

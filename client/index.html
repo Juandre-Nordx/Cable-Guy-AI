@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cable Guy AI | WiFi Help + Kits</title>
+    <title>Cable Guy AI | Smarter Network Support</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,42 +11,82 @@
       <a class="brand" href="/index.html">Cable Guy AI</a>
       <nav>
         <a href="/index.html" class="active">Home</a>
-        <a href="/store.html">Store</a>
-        <a href="/register.html">Create Account</a>
-        <a href="/login.html">Login</a>
+        <a href="/ai.html">AI Assistant</a>
+        <a href="/login.html">Login / Register</a>
+        <a href="/store.html" data-store-link>Store</a>
       </nav>
     </header>
 
     <main>
       <section class="hero">
         <div>
-          <p class="eyebrow">Smart WiFi Support</p>
-          <h1>Account-to-Delivery Customer Flow</h1>
-          <p>Create your account, order your networking kit, and track delivery status in real time.</p>
+          <p class="eyebrow">Know Your Network. Solve More Yourself.</p>
+          <h1>Learn faster, troubleshoot smarter, and only call a technician when truly needed.</h1>
+          <p>
+            Cable Guy AI helps you understand common network problems, choose the right products,
+            and get pre-configured kits that are ready to install.
+          </p>
           <div class="hero-actions">
             <a class="button primary" href="/register.html">Create Account</a>
             <a class="button secondary" href="/login.html">Login</a>
-            <a class="button secondary" href="/store.html">Browse Kits</a>
+            <a class="button secondary" href="/ai.html">Try AI Assistant</a>
           </div>
         </div>
       </section>
 
-      <section class="feature-grid">
+      <section class="card educational-section">
+        <h2>Know Your Network. Fix It Yourself.</h2>
+        <p>
+          We are here to solve a real problem. Many call-outs are for simple issues like unplugged
+          devices or basic setup mistakes.
+        </p>
+        <p>
+          Our goal is to empower you to understand your network, fix simple problems yourself, and
+          only call a technician when truly needed.
+        </p>
+      </section>
+
+      <section class="feature-grid value-grid" aria-label="Core value sections">
         <article class="card">
-          <h2>Customer Accounts</h2>
-          <p>Register with your delivery details and securely log in with JWT authentication.</p>
+          <h2>AI Network Assistant</h2>
+          <p>
+            We have an AI that helps you diagnose and fix basic network problems without needing a
+            technician.
+          </p>
         </article>
 
         <article class="card">
-          <h2>Order Tracking</h2>
-          <p>Place orders from the store and track every delivery stage from your dashboard.</p>
+          <h2>Network Store</h2>
+          <p>
+            We offer a store with all the products you may need for your network builds.
+          </p>
         </article>
 
         <article class="card">
-          <h2>Admin Operations</h2>
-          <p>Admins can monitor users, manage all orders, and update status in one dashboard.</p>
+          <h2>Pre-Configured Kits</h2>
+          <p>
+            We build custom kits that you can install yourself. They are pre-configured to your
+            needs so you can save money and avoid technician call-outs.
+          </p>
         </article>
       </section>
+
+      <section class="card preview-section" aria-labelledby="preview-title">
+        <div class="preview-header">
+          <h2 id="preview-title">Popular Kits &amp; Products</h2>
+          <p class="subtext">Preview available options now. Login is required to view full details and purchase.</p>
+        </div>
+        <p id="preview-error" class="warning hidden" role="status"></p>
+
+        <h3 class="section-subheading">Popular Kits</h3>
+        <div id="kit-preview-grid" class="feature-grid"></div>
+
+        <h3 class="section-subheading">Popular Products</h3>
+        <div id="product-preview-grid" class="feature-grid"></div>
+      </section>
     </main>
+
+    <script src="/auth.js"></script>
+    <script src="/index.js"></script>
   </body>
 </html>

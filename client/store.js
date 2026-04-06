@@ -1,3 +1,5 @@
+const hasStoreAccess = typeof requireStoreAccess === 'function' ? requireStoreAccess() : true;
+
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
 const query = new URLSearchParams(window.location.search);
@@ -186,5 +188,7 @@ async function loadProducts() {
   }
 }
 
-loadKits();
-loadProducts();
+if (hasStoreAccess) {
+  loadKits();
+  loadProducts();
+}

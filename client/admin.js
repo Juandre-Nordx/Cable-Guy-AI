@@ -16,6 +16,7 @@ const state = {
     edges: [],
     selectedConnections: [],
     selectedNodeId: null,
+    selectedEdgeId: null,
     connectMode: false,
     connectSourceId: null
   }
@@ -510,9 +511,13 @@ async function loadWizardConnections(nodeId) {
   try {
     const payload = await apiFetch(`/admin/wizard/edges?node_id=${nodeId}`);
     state.wizard.selectedConnections = payload.edges || [];
+    if (!state.wizard.selectedConnections.some((edge) => edge.id === state.wizard.selectedEdgeId)) {
+      state.wizard.selectedEdgeId = null;
+    }
     renderExistingConnections();
   } catch (error) {
     state.wizard.selectedConnections = [];
+    state.wizard.selectedEdgeId = null;
     countLabel.textContent = '0';
     edgeList.innerHTML = `<p class="warning">${error.message}</p>`;
   }
@@ -612,7 +617,7 @@ function renderExistingConnections() {
         .join('');
 
       return `
-        <div class="wizard-edge-pill wizard-edge-edit" data-edge-row="${edge.id}">
+        <div class="wizard-edge-pill wizard-edge-edit ${edge.id === state.wizard.selectedEdgeId ? 'selected' : ''}" data-edge-row="${edge.id}">
           <input type="text" value="${escapeHtml(edge.label)}" data-edge-label="${edge.id}" />
           <select data-edge-target="${edge.id}">${targetOptions}</select>
           <button class="button primary" type="button" data-save-edge="${edge.id}">Save</button>
@@ -668,8 +673,10 @@ function renderWizardGraph() {
       const labelX = (x1 + x2) / 2;
       const labelY = (y1 + y2) / 2 - 6;
       return `
-        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#334155" stroke-width="2"></line>
-        <text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="11" text-anchor="middle">${escapeHtml(edge.label)}</text>
+        <g class="wizard-edge-line ${edge.id === state.wizard.selectedEdgeId ? 'selected' : ''}" data-wizard-graph-edge="${edge.id}">
+          <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#334155" stroke-width="2"></line>
+          <text x="${labelX}" y="${labelY}" fill="#0f172a" font-size="11" text-anchor="middle">${escapeHtml(edge.label)}</text>
+        </g>
       `;
     })
     .join('');
@@ -681,6 +688,12 @@ function renderWizardGraph() {
 
   document.querySelectorAll('[data-wizard-graph-node]').forEach((button) => {
     button.addEventListener('click', () => handleWizardNodeClick(Number(button.dataset.wizardGraphNode)));
+  });
+
+  document.querySelectorAll('[data-wizard-graph-edge]').forEach((edgeEl) => {
+    edgeEl.addEventListener('click', () => {
+      openWizardEdgeFromGraph(Number(edgeEl.dataset.wizardGraphEdge));
+    });
   });
 }
 
@@ -754,8 +767,22 @@ function handleWizardNodeClick(nodeId) {
   }
 
   state.wizard.selectedNodeId = nodeId;
+  state.wizard.selectedEdgeId = null;
   renderWizardBuilder();
   loadWizardConnections(nodeId);
+}
+
+async function openWizardEdgeFromGraph(edgeId) {
+  const edge = state.wizard.edges.find((entry) => entry.id === edgeId);
+  if (!edge) return;
+
+  state.wizard.selectedNodeId = edge.from_node_id;
+  state.wizard.selectedEdgeId = edgeId;
+  renderWizardBuilder();
+  await loadWizardConnections(edge.from_node_id);
+  const row = document.querySelector(`[data-edge-row="${edgeId}"]`);
+  row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setFormMessage('wizard-edge-message', `Editing connection #${edgeId}.`, 'subtext');
 }
 
 function toggleWizardConnectMode() {
@@ -880,6 +907,7 @@ async function updateWizardEdge(edgeId) {
   const targetSelect = document.querySelector(`[data-edge-target="${edgeId}"]`);
   const label = labelInput?.value?.trim();
   const toNodeId = Number(targetSelect?.value);
+  state.wizard.selectedEdgeId = edgeId;
 
   try {
     await apiFetch(`/admin/wizard/edge/${edgeId}`, {
@@ -904,6 +932,9 @@ async function deleteWizardEdge(edgeId, confirmDelete = false) {
 
   try {
     await apiFetch(`/admin/wizard/edge/${edgeId}`, { method: 'DELETE' });
+    if (state.wizard.selectedEdgeId === edgeId) {
+      state.wizard.selectedEdgeId = null;
+    }
     setFormMessage('wizard-edge-message', 'Connection deleted.', 'success');
     await loadWizardBuilder();
     await loadWizardConnections(state.wizard.selectedNodeId);

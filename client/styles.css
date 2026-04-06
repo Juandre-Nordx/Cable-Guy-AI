@@ -183,6 +183,11 @@ input {
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
 }
 
+.product-card.recommended {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
 .warning {
   color: var(--warn);
   font-weight: 700;

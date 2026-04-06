@@ -95,8 +95,8 @@ function renderWizardResult(payload) {
                   <p class="subtext">${item.type}</p>
                   <p><strong>Price:</strong> ${formatPrice(item.price, item.currency)}</p>
                   <div class="kit-card-actions">
-                    <a class="button secondary" href="${resolveItemLink(item, 'view')}">View</a>
-                    <a class="button primary" href="${resolveItemLink(item, 'buy')}">Buy</a>
+                    <a class="button secondary" href="${buildStoreLink(item)}">View</a>
+                    <button class="button primary" type="button" data-buy-item="${encodeURIComponent(JSON.stringify({ type: item.type, id: item.id, category: item.category || '' }))}">Buy</button>
                   </div>
                 </article>
               `
@@ -123,6 +123,47 @@ function renderWizardResult(payload) {
     bookingSection.classList.remove('hidden');
     bookingSection.scrollIntoView({ behavior: 'smooth' });
   });
+
+  wizardResult.querySelectorAll('[data-buy-item]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const raw = button.getAttribute('data-buy-item');
+      if (!raw) return;
+      handleWizardBuy(raw);
+    });
+  });
+}
+
+function buildStoreLink(item) {
+  const params = new URLSearchParams();
+  if (item.type === 'product') params.set('product_id', item.id);
+  if (item.type === 'kit') params.set('kit_id', item.id);
+  if (item.type === 'service') params.set('service_id', item.id);
+  if (item.category) params.set('category', item.category);
+  const query = params.toString();
+  return `/store.html${query ? `?${query}` : ''}`;
+}
+
+function handleWizardBuy(rawItem) {
+  let item;
+  try {
+    item = JSON.parse(decodeURIComponent(rawItem));
+  } catch (_error) {
+    return;
+  }
+
+  if (!localStorage.getItem('token')) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  window.location.href = buildStoreLink(item);
+}
+
+function formatPrice(amount, currency = 'ZAR') {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return 'Contact us';
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
+  return `${symbol}${numericAmount.toFixed(2)}`;
 }
 
 function resolveItemLink(item, action = 'view') {

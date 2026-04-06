@@ -71,13 +71,17 @@
           <article class="card">
             <h3>Add Product</h3>
             <form id="product-form" class="stack-form" enctype="multipart/form-data">
+              <input type="hidden" name="id" />
               <label>Name<input type="text" name="name" required /></label>
               <label>Category<input type="text" name="category" required /></label>
               <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
               <label>Cost<input type="number" name="cost" min="0" step="0.01" required /></label>
               <label>Description<textarea name="description" rows="3"></textarea></label>
               <label>Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
-              <button class="button primary" type="submit">Save Product</button>
+              <div class="kit-card-actions">
+                <button class="button primary" type="submit" id="product-save-button">Save Product</button>
+                <button class="button secondary hidden" type="button" id="product-cancel-edit">Cancel</button>
+              </div>
               <p id="product-message" class="subtext"></p>
             </form>
           </article>
@@ -95,6 +99,7 @@
           <article class="card">
             <h3>Add Kit</h3>
             <form id="kit-form" class="stack-form">
+              <input type="hidden" name="id" />
               <label>Name<input type="text" name="name" required /></label>
               <label>
                 Category
@@ -125,7 +130,10 @@
               <label>Instructions<textarea name="instructions" rows="5" placeholder="Installation and setup guidance"></textarea></label>
               <label>Installation Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
               <label>Video URL<input type="url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." /></label>
-              <button class="button primary" type="submit">Save Kit</button>
+              <div class="kit-card-actions">
+                <button class="button primary" type="submit" id="kit-save-button">Save Kit</button>
+                <button class="button secondary hidden" type="button" id="kit-cancel-edit">Cancel</button>
+              </div>
               <p id="kit-message" class="subtext"></p>
             </form>
           </article>
@@ -143,10 +151,14 @@
           <article class="card">
             <h3>Add Service</h3>
             <form id="service-form" class="stack-form">
+              <input type="hidden" name="id" />
               <label>Name<input type="text" name="name" required /></label>
               <label>Description<textarea name="description" rows="3"></textarea></label>
               <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
-              <button class="button primary" type="submit">Save Service</button>
+              <div class="kit-card-actions">
+                <button class="button primary" type="submit" id="service-save-button">Save Service</button>
+                <button class="button secondary hidden" type="button" id="service-cancel-edit">Cancel</button>
+              </div>
               <p id="service-message" class="subtext"></p>
             </form>
           </article>

@@ -61,6 +61,9 @@ function bindFormEvents() {
   document.getElementById('wizard-node-form').addEventListener('submit', submitWizardNode);
   document.getElementById('wizard-delete-node').addEventListener('click', deleteWizardNodeBySelection);
   document.querySelector('#wizard-node-form select[name="type"]').addEventListener('change', toggleWizardResultFields);
+  document.getElementById('product-cancel-edit').addEventListener('click', () => resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit'));
+  document.getElementById('kit-cancel-edit').addEventListener('click', () => resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit'));
+  document.getElementById('service-cancel-edit').addEventListener('click', () => resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit'));
 }
 
 async function bootAdmin() {
@@ -291,6 +294,7 @@ async function submitProduct(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
+  const editId = Number(formData.get('id') || 0);
 
   const image = formData.get('image');
   let imageUrl = '';
@@ -310,14 +314,14 @@ async function submitProduct(event) {
       image_url: imageUrl || null
     };
 
-    await apiFetch('/admin/product', {
-      method: 'POST',
+    await apiFetch(editId ? `/admin/product/${editId}` : '/admin/product', {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productPayload)
     });
 
-    setFormMessage('product-message', 'Product added successfully.', 'success');
-    form.reset();
+    setFormMessage('product-message', editId ? 'Product updated successfully.' : 'Product added successfully.', 'success');
+    resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit');
     await loadProducts();
     await loadDashboard();
   } catch (error) {
@@ -330,6 +334,7 @@ async function submitKit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const data = new FormData(form);
+  const editId = Number(data.get('id') || 0);
 
   let imageUrl = '';
 
@@ -351,14 +356,14 @@ async function submitKit(event) {
       video_url: data.get('video_url')?.toString().trim() || null
     };
 
-    await apiFetch('/admin/kit', {
-      method: 'POST',
+    await apiFetch(editId ? `/admin/kit/${editId}` : '/admin/kit', {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    setFormMessage('kit-message', 'Kit added successfully.', 'success');
-    form.reset();
+    setFormMessage('kit-message', editId ? 'Kit updated successfully.' : 'Kit added successfully.', 'success');
+    resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit');
     await loadKits();
     await loadDashboard();
   } catch (error) {
@@ -371,6 +376,7 @@ async function submitService(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const data = new FormData(form);
+  const editId = Number(data.get('id') || 0);
 
   const payload = {
     name: data.get('name')?.toString().trim(),
@@ -379,14 +385,14 @@ async function submitService(event) {
   };
 
   try {
-    await apiFetch('/admin/service', {
-      method: 'POST',
+    await apiFetch(editId ? `/admin/service/${editId}` : '/admin/service', {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    setFormMessage('service-message', 'Service added successfully.', 'success');
-    form.reset();
+    setFormMessage('service-message', editId ? 'Service updated successfully.' : 'Service added successfully.', 'success');
+    resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit');
     await loadServices();
   } catch (error) {
     console.error('[Admin] service submit failed:', error.message);
@@ -432,14 +438,27 @@ function renderProductsTable() {
         <td>${product.category}</td>
         <td>${formatPrice(product.price, product.currency)}</td>
         <td>${product.image_url ? `<a href="${product.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" type="button" data-edit-product="${product.id}">Edit</button>
+            <button class="button secondary" type="button" data-delete-product="${product.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('products-table-wrap').innerHTML = state.products.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Image</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No products found.</p>';
+
+  document.querySelectorAll('[data-edit-product]').forEach((button) => {
+    button.addEventListener('click', () => startEditProduct(Number(button.dataset.editProduct)));
+  });
+  document.querySelectorAll('[data-delete-product]').forEach((button) => {
+    button.addEventListener('click', () => deleteProduct(Number(button.dataset.deleteProduct)));
+  });
 }
 
 async function loadKits() {
@@ -465,14 +484,27 @@ function renderKitsTable() {
         <td>${kit.instructions ? 'Included' : '-'}</td>
         <td>${kit.image_url ? `<a href="${kit.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
         <td>${kit.video_url ? `<a href="${kit.video_url}" target="_blank" rel="noopener noreferrer">Video</a>` : '-'}</td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" type="button" data-edit-kit="${kit.id}">Edit</button>
+            <button class="button secondary" type="button" data-delete-kit="${kit.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('kits-table-wrap').innerHTML = state.kits.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No kits found.</p>';
+
+  document.querySelectorAll('[data-edit-kit]').forEach((button) => {
+    button.addEventListener('click', () => startEditKit(Number(button.dataset.editKit)));
+  });
+  document.querySelectorAll('[data-delete-kit]').forEach((button) => {
+    button.addEventListener('click', () => deleteKit(Number(button.dataset.deleteKit)));
+  });
 }
 
 async function loadServices() {
@@ -523,14 +555,118 @@ function renderServicesTable() {
         <td>${service.name}</td>
         <td>${service.description}</td>
         <td>$${Number(service.price).toFixed(2)}</td>
+        <td>
+          <div class="admin-order-actions">
+            <button class="button secondary" type="button" data-edit-service="${service.id}">Edit</button>
+            <button class="button secondary" type="button" data-delete-service="${service.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
     .join('');
 
   document.getElementById('services-table-wrap').innerHTML = state.services.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No services found.</p>';
+
+  document.querySelectorAll('[data-edit-service]').forEach((button) => {
+    button.addEventListener('click', () => startEditService(Number(button.dataset.editService)));
+  });
+  document.querySelectorAll('[data-delete-service]').forEach((button) => {
+    button.addEventListener('click', () => deleteService(Number(button.dataset.deleteService)));
+  });
+}
+
+function resetEntityForm(formId, saveButtonId, defaultLabel, cancelButtonId) {
+  const form = document.getElementById(formId);
+  form?.reset();
+  if (form?.elements?.id) {
+    form.elements.id.value = '';
+  }
+  const saveButton = document.getElementById(saveButtonId);
+  if (saveButton) saveButton.textContent = defaultLabel;
+  const cancelButton = document.getElementById(cancelButtonId);
+  cancelButton?.classList.add('hidden');
+}
+
+function startEditProduct(id) {
+  const product = state.products.find((entry) => entry.id === id);
+  const form = document.getElementById('product-form');
+  if (!product || !form) return;
+  form.elements.id.value = String(product.id);
+  form.elements.name.value = product.name || '';
+  form.elements.category.value = product.category || '';
+  form.elements.price.value = product.price ?? '';
+  form.elements.cost.value = product.cost ?? '';
+  form.elements.description.value = product.description || '';
+  document.getElementById('product-save-button').textContent = 'Update Product';
+  document.getElementById('product-cancel-edit').classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteProduct(id) {
+  if (!window.confirm('Are you sure you want to delete this product?')) return;
+  try {
+    await apiFetch(`/admin/product/${id}`, { method: 'DELETE' });
+    setFormMessage('product-message', `Product #${id} deleted successfully.`, 'success');
+    await Promise.all([loadProducts(), loadDashboard()]);
+  } catch (error) {
+    setFormMessage('product-message', error.message, 'warning');
+  }
+}
+
+function startEditKit(id) {
+  const kit = state.kits.find((entry) => entry.id === id);
+  const form = document.getElementById('kit-form');
+  if (!kit || !form) return;
+  form.elements.id.value = String(kit.id);
+  form.elements.name.value = kit.name || '';
+  form.elements.category.value = kit.category || 'home';
+  form.elements.price.value = kit.price ?? '';
+  form.elements.difficulty.value = kit.difficulty || 'easy';
+  form.elements.requires_technician.checked = Boolean(kit.requires_technician);
+  form.elements.description.value = kit.description || '';
+  form.elements.instructions.value = kit.instructions || '';
+  form.elements.video_url.value = kit.video_url || '';
+  document.getElementById('kit-save-button').textContent = 'Update Kit';
+  document.getElementById('kit-cancel-edit').classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteKit(id) {
+  if (!window.confirm('Are you sure you want to delete this kit?')) return;
+  try {
+    await apiFetch(`/admin/kit/${id}`, { method: 'DELETE' });
+    setFormMessage('kit-message', `Kit #${id} deleted successfully.`, 'success');
+    await Promise.all([loadKits(), loadDashboard()]);
+  } catch (error) {
+    setFormMessage('kit-message', error.message, 'warning');
+  }
+}
+
+function startEditService(id) {
+  const service = state.services.find((entry) => entry.id === id);
+  const form = document.getElementById('service-form');
+  if (!service || !form) return;
+  form.elements.id.value = String(service.id);
+  form.elements.name.value = service.name || '';
+  form.elements.description.value = service.description || '';
+  form.elements.price.value = service.price ?? '';
+  document.getElementById('service-save-button').textContent = 'Update Service';
+  document.getElementById('service-cancel-edit').classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deleteService(id) {
+  if (!window.confirm('Are you sure you want to delete this service?')) return;
+  try {
+    await apiFetch(`/admin/service/${id}`, { method: 'DELETE' });
+    setFormMessage('service-message', `Service #${id} deleted successfully.`, 'success');
+    await loadServices();
+  } catch (error) {
+    setFormMessage('service-message', error.message, 'warning');
+  }
 }
 
 async function loadWizardBuilder() {

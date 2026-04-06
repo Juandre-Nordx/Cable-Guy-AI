@@ -134,6 +134,71 @@ async function createKit(req, res) {
   }
 }
 
+async function updateKit(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const {
+      name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url
+    } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid kit id.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE kits
+      SET name = COALESCE($2, name),
+          category = COALESCE($3, category),
+          price = COALESCE($4, price),
+          difficulty = COALESCE($5, difficulty),
+          requires_technician = COALESCE($6, requires_technician),
+          description = COALESCE($7, description),
+          instructions = COALESCE($8, instructions),
+          image_url = COALESCE($9, image_url),
+          video_url = COALESCE($10, video_url)
+      WHERE id = $1
+      RETURNING *;
+      `,
+      [
+        id,
+        requiredString(name) ? name.trim() : null,
+        validateEnum(category, KIT_CATEGORIES) ? category : null,
+        validateNumber(price) ? price : null,
+        requiredString(difficulty) ? difficulty.trim() : null,
+        typeof requires_technician === 'boolean' ? requires_technician : null,
+        requiredString(description) ? description.trim() : null,
+        requiredString(instructions) ? instructions.trim() : null,
+        requiredString(image_url) ? image_url.trim() : null,
+        requiredString(video_url) ? video_url.trim() : null
+      ]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Kit not found.' });
+    }
+
+    return res.json({ success: true, kit: result.rows[0] });
+  } catch (error) {
+    console.error('[PUT /admin/kit/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update kit.' });
+  }
+}
+
+async function deleteKit(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const result = await query('DELETE FROM kits WHERE id = $1 RETURNING id;', [id]);
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Kit not found.' });
+    }
+    return res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('[DELETE /admin/kit/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete kit.' });
+  }
+}
+
 
 async function createService(req, res) {
   try {
@@ -156,6 +221,57 @@ async function createService(req, res) {
   } catch (error) {
     console.error('[POST /admin/service] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to create service.' });
+  }
+}
+
+async function updateService(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const { name, description, price } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid service id.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE services
+      SET name = COALESCE($2, name),
+          description = COALESCE($3, description),
+          price = COALESCE($4, price)
+      WHERE id = $1
+      RETURNING *;
+      `,
+      [
+        id,
+        requiredString(name) ? name.trim() : null,
+        requiredString(description) ? description.trim() : null,
+        validateNumber(price) ? price : null
+      ]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Service not found.' });
+    }
+
+    return res.json({ success: true, service: result.rows[0] });
+  } catch (error) {
+    console.error('[PUT /admin/service/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update service.' });
+  }
+}
+
+async function deleteService(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const result = await query('DELETE FROM services WHERE id = $1 RETURNING id;', [id]);
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Service not found.' });
+    }
+    return res.json({ success: true, deleted: result.rows[0] });
+  } catch (error) {
+    console.error('[DELETE /admin/service/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to delete service.' });
   }
 }
 
@@ -621,7 +737,11 @@ module.exports = {
   updateProduct,
   deleteProduct,
   createKit,
+  updateKit,
+  deleteKit,
   createService,
+  updateService,
+  deleteService,
   listUsers,
   dashboard,
   getAdminSettings,

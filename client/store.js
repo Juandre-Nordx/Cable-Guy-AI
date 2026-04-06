@@ -1,10 +1,11 @@
-const hasStoreAccess = typeof requireStoreAccess === 'function' ? requireStoreAccess() : true;
-
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
 const orderFlowModal = document.getElementById('order-flow-modal');
 const query = new URLSearchParams(window.location.search);
 const highlightedCategory = query.get('category');
+const highlightedProductId = Number(query.get('product_id') || 0);
+const highlightedKitId = Number(query.get('kit_id') || 0);
+const highlightedServiceId = Number(query.get('service_id') || 0);
 const CURRENCY_SYMBOLS = { ZAR: 'R', USD: '$', EUR: '€' };
 let showOrderPopup = false;
 
@@ -58,7 +59,8 @@ function renderStep(step) {
 
 function renderKit(kit) {
   const card = document.createElement('article');
-  card.className = `card kit-card ${highlightedCategory === kit.category ? 'recommended' : ''}`;
+  card.className = `card kit-card ${highlightedCategory === kit.category || highlightedKitId === kit.id ? 'recommended' : ''}`;
+  card.id = `kit-card-${kit.id}`;
 
   const embedUrl = toEmbedUrl(kit.video_url);
   const detailsId = `kit-details-${kit.id}`;
@@ -100,7 +102,8 @@ function renderKit(kit) {
 
 function renderProduct(product) {
   const card = document.createElement('article');
-  card.className = 'card product-card';
+  card.className = `card product-card ${highlightedProductId === product.id ? 'recommended' : ''}`;
+  card.id = `product-card-${product.id}`;
 
   card.innerHTML = `
     ${product.image_url ? `<img src="${product.image_url}" alt="${product.name}" loading="lazy" />` : ''}
@@ -130,10 +133,21 @@ function toggleOrderFlowModal() {
   orderFlowModal.classList.toggle('hidden', !showOrderPopup);
 }
 
+function highlightRequestedItems() {
+  const targets = [];
+  if (highlightedProductId > 0) targets.push(document.getElementById(`product-card-${highlightedProductId}`));
+  if (highlightedKitId > 0) targets.push(document.getElementById(`kit-card-${highlightedKitId}`));
+
+  if (!targets.length && highlightedServiceId > 0) {
+    targets.push(productGrid);
+  }
+
+  const first = targets.find(Boolean);
+  first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function showOrderFlowModalAfterClick() {
   if (!orderFlowModal) return Promise.resolve(true);
-
-  showOrderPopup = true;
   toggleOrderFlowModal();
 
   return new Promise((resolve) => {
@@ -167,6 +181,7 @@ async function placeOrder(kitId, kitName) {
     return;
   }
 
+  showOrderPopup = true;
   const confirmed = await showOrderFlowModalAfterClick();
   if (!confirmed) {
     return;
@@ -212,6 +227,7 @@ async function loadKits() {
     payload.kits.forEach((kit) => {
       kitGrid.appendChild(renderKit(kit));
     });
+    highlightRequestedItems();
   } catch (error) {
     console.error('[Store] Kits load failed:', error.message);
     kitGrid.innerHTML = `<p class="warning">Error: ${error.message}</p>`;
@@ -236,13 +252,13 @@ async function loadProducts() {
     payload.products.forEach((product) => {
       productGrid.appendChild(renderProduct(product));
     });
+    highlightRequestedItems();
   } catch (error) {
     console.error('[Store] Products load failed:', error.message);
     productGrid.innerHTML = `<p class="warning">Error: ${error.message}</p>`;
   }
 }
 
-if (hasStoreAccess) {
-  loadKits();
-  loadProducts();
-}
+loadKits();
+loadProducts();
+toggleOrderFlowModal();

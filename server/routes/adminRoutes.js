@@ -9,7 +9,11 @@ const {
   updateProduct,
   deleteProduct,
   createKit,
+  updateKit,
+  deleteKit,
   createService,
+  updateService,
+  deleteService,
   listUsers,
   dashboard,
   getAdminSettings,
@@ -66,7 +70,11 @@ router.post('/product', createProduct);
 router.put('/product/:id', updateProduct);
 router.delete('/product/:id', deleteProduct);
 router.post('/kit', createKit);
+router.put('/kit/:id', updateKit);
+router.delete('/kit/:id', deleteKit);
 router.post('/service', createService);
+router.put('/service/:id', updateService);
+router.delete('/service/:id', deleteService);
 router.post('/upload', upload.single('image'), uploadImage);
 router.get('/wizard/nodes', listWizardNodes);
 router.post('/wizard/node', createWizardNode);

@@ -634,19 +634,17 @@ label {
 }
 
 .modal-overlay {
+  display: none;
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.62);
-  display: grid;
   place-items: center;
   padding: 1rem;
   z-index: 1000;
-  opacity: 0;
-  transition: opacity 0.2s ease;
 }
 
 .modal-overlay.open {
-  opacity: 1;
+  display: grid;
 }
 
 .modal-card {

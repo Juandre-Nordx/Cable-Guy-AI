@@ -1,0 +1,159 @@
+CRITICAL BUG: My STORE and CART pages are freezing.
+
+PROBLEM:
+- Page loads but ALL buttons stop working
+- No console errors
+- Clicking anything does nothing
+- Happens on store and cart pages
+
+GOAL:
+Find and fix the root cause of UI freezing and restore full interactivity.
+
+---
+
+PART 1 — ROOT CAUSE INVESTIGATION (MANDATORY)
+
+Check for these issues:
+
+1. Blocking overlay covering page
+   - Invisible div with high z-index
+   - Modal not closing properly
+
+2. JavaScript not executing after load
+   - DOMContentLoaded not firing
+   - Script errors silently stopping execution
+
+3. Event listeners not attached
+   - Dynamic content not bound
+   - Wrong selectors
+
+4. Infinite loop or blocking code
+   - while(true)
+   - recursive rendering
+   - heavy sync loops
+
+5. Pointer events disabled
+   - CSS: pointer-events: none
+
+---
+
+PART 2 — QUICK FIX TESTS (IMPLEMENT)
+
+Add this TEMPORARY debug:
+
+document.addEventListener("click", () => {
+  console.log("CLICK WORKING");
+});
+
+IF this does NOT log:
+→ UI is blocked by overlay or JS crash
+
+---
+
+PART 3 — REMOVE BLOCKING OVERLAY
+
+Check for any element like:
+
+.modal
+.overlay
+.popup
+
+Ensure:
+
+- display: none when not active
+- pointer-events: none when hidden
+
+Fix:
+
+.hidden {
+  display: none;
+  pointer-events: none;
+}
+
+---
+
+PART 4 — FORCE EVENT DELEGATION (CRITICAL)
+
+Replace ALL button handlers with:
+
+document.addEventListener("click", (e) => {
+
+  const btn = e.target.closest("button");
+
+  if (!btn) return;
+
+  console.log("Button clicked:", btn);
+
+});
+
+If this works:
+→ problem is missing event binding
+
+---
+
+PART 5 — ENSURE SCRIPTS LOAD
+
+Check:
+
+- Scripts are included at bottom of page
+OR
+- Wrapped in:
+
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("JS Loaded");
+});
+
+---
+
+PART 6 — CHECK CONSOLE SILENT FAILURES
+
+Wrap ALL main JS in:
+
+try {
+  // app init
+} catch (err) {
+  console.error("App crash:", err);
+}
+
+---
+
+PART 7 — REMOVE INLINE onclick
+
+Replace ALL:
+
+onclick="..."
+
+WITH proper JS listeners
+
+---
+
+PART 8 — CHECK CSS BLOCKING
+
+Search for:
+
+pointer-events: none;
+
+Remove unless needed
+
+---
+
+PART 9 — FINAL FIX REQUIREMENTS
+
+After fix:
+
+- All buttons clickable
+- Store works
+- Cart works
+- No freeze
+- Console logs clicks
+
+---
+
+PART 10 — OUTPUT
+
+Provide:
+
+- Root cause explanation
+- Fixed JS
+- Fixed CSS (if needed)
+- Working store/cart interaction

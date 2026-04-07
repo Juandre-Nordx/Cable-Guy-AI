@@ -1,0 +1,249 @@
+Rebuild my STORE system in Cable Guy AI into a fully working end-to-end eCommerce flow.
+
+GOAL:
+- Add cart system
+- Add "Add to Cart" for products, kits, services
+- Fix "More Details" button
+- Add checkout flow
+- Create orders properly
+- Sync orders to user dashboard and admin panel
+- Eliminate ALL freezing and broken buttons
+
+---
+
+PART 1 — STORE REDESIGN
+
+Each item (product, kit, service) must display:
+
+- Image
+- Name
+- Description
+- Price (use system currency)
+- Buttons:
+  [More Details]
+  [Add to Cart]
+
+---
+
+PART 2 — FIX "MORE DETAILS" BUTTON
+
+Problem:
+Currently not working
+
+---
+
+Solution:
+
+Use modal (NOT redirect)
+
+---
+
+EVENT DELEGATION:
+
+document.addEventListener("click", async (e) => {
+  const detailsBtn = e.target.closest(".details-btn");
+
+  if (detailsBtn) {
+    e.preventDefault();
+    await openDetails(detailsBtn.dataset.id);
+  }
+});
+
+---
+
+async function openDetails(id) {
+  const res = await fetch(`/kits/${id}`);
+  const item = await res.json();
+
+  const modal = document.getElementById("detailsModal");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h2>${item.name}</h2>
+      <p>${item.description}</p>
+      <h4>Instructions</h4>
+      <p>${item.instructions || "No instructions available"}</p>
+      <button onclick="closeDetailsModal()">Close</button>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+}
+
+function closeDetailsModal() {
+  document.getElementById("detailsModal").style.display = "none";
+}
+
+---
+
+PART 3 — CART SYSTEM
+
+Create client-side cart (localStorage):
+
+cart = [
+  {
+    id,
+    type: "product" | "kit" | "service",
+    name,
+    price,
+    qty
+  }
+]
+
+---
+
+FUNCTIONS:
+
+function addToCart(item) {
+  let cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+  const existing = cart.find(i => i.id === item.id);
+
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    cart.push({ ...item, qty: 1 });
+  }
+
+  localStorage.setItem("cart", JSON.stringify(cart));
+  alert("Added to cart");
+}
+
+---
+
+PART 4 — ADD TO CART BUTTON
+
+Use event delegation:
+
+const cartBtn = e.target.closest(".add-to-cart-btn");
+
+if (cartBtn) {
+  const item = {
+    id: cartBtn.dataset.id,
+    type: cartBtn.dataset.type,
+    name: cartBtn.dataset.name,
+    price: cartBtn.dataset.price
+  };
+
+  addToCart(item);
+}
+
+---
+
+PART 5 — CART PAGE (NEW)
+
+Create:
+
+/cart.html
+
+Display:
+- Items
+- Quantity
+- Total price
+
+Buttons:
+- Remove item
+- Checkout
+
+---
+
+PART 6 — CHECKOUT FLOW
+
+On checkout:
+
+1. Show "How your order works" popup
+2. Confirm order
+3. Send order to backend
+
+---
+
+async function checkout() {
+  const cart = JSON.parse(localStorage.getItem("cart")) || [];
+
+  const res = await fetch("/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      items: cart
+    })
+  });
+
+  const data = await res.json();
+
+  localStorage.removeItem("cart");
+
+  showOrderPopup();
+}
+
+---
+
+PART 7 — BACKEND ORDER STRUCTURE
+
+Order must include:
+
+orders:
+- id
+- user_id
+- status (placed, processing, delivered, done)
+- total
+- created_at
+
+order_items:
+- id
+- order_id
+- item_id
+- type
+- qty
+- price
+
+---
+
+PART 8 — USER DASHBOARD
+
+Display:
+- Orders list
+- Status
+- Notes
+
+---
+
+PART 9 — ADMIN PANEL
+
+Super admin can:
+- View all orders
+- Update status
+- Add notes
+
+---
+
+PART 10 — FIX FREEZING (CRITICAL)
+
+- Remove inline onclick
+- Use event delegation
+- Use async/await
+- Add try/catch
+- No blocking loops
+
+---
+
+PART 11 — UI REQUIREMENTS
+
+- Clean layout
+- Responsive
+- Modal support
+- No blocking overlays
+
+---
+
+PART 12 — OUTPUT
+
+Provide:
+
+- Updated store.html
+- cart.html
+- JS logic for cart + checkout
+- Fixed button interactions
+- Backend order logic
+- Fully working end-to-end system

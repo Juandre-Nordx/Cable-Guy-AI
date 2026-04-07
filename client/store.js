@@ -119,14 +119,45 @@ function closeDetailsModal() {
   lockBodyScroll(false);
 }
 
+function renderSteps(steps) {
+  if (!Array.isArray(steps) || !steps.length) return '';
+  return `
+    <h4 class="details-section-title">Step-by-Step Instructions</h4>
+    <ol class="kit-steps-list">
+      ${steps
+        .sort((a, b) => a.step_number - b.step_number)
+        .map(
+          (s) => `
+        <li class="kit-step-item">
+          <span class="kit-step-number">${s.step_number}</span>
+          <div class="kit-step-body">
+            <strong class="kit-step-title">${escapeHtml(s.title)}</strong>
+            <p class="kit-step-desc">${escapeHtml(s.description || '')}</p>
+            ${s.image_url ? `<img src="${s.image_url}" alt="${escapeHtml(s.title)}" class="kit-step-image" loading="lazy" />` : ''}
+          </div>
+        </li>`
+        )
+        .join('')}
+    </ol>
+  `;
+}
+
 function openDetailsModal(item) {
+  const hasSteps = Array.isArray(item.steps) && item.steps.length > 0;
+  const hasInstructions = item.instructions && item.instructions.trim();
+
+  document.getElementById('details-modal-title').textContent = item.name || 'Details';
+
   detailsModalBody.innerHTML = `
-    <h4>${escapeHtml(item.name)}</h4>
-    <p>${escapeHtml(item.description || '')}</p>
-    <h4>Instructions</h4>
-    <p>${escapeHtml(item.instructions || 'No instructions available')}</p>
     ${item.image_url ? `<img src="${item.image_url}" alt="${escapeHtml(item.name)}" class="kit-main-image" loading="lazy" />` : ''}
-    ${item.video_url ? `<p><a href="${item.video_url}" target="_blank" rel="noopener noreferrer">Watch video</a></p>` : ''}
+    <p class="details-description">${escapeHtml(item.description || '')}</p>
+    ${item.video_url ? `<p class="details-video-link"><a href="${item.video_url}" target="_blank" rel="noopener noreferrer">▶ Watch video guide</a></p>` : ''}
+    ${hasSteps
+      ? renderSteps(item.steps)
+      : hasInstructions
+        ? `<h4 class="details-section-title">Instructions</h4><p>${escapeHtml(item.instructions)}</p>`
+        : '<p class="subtext">No instructions available for this item.</p>'
+    }
   `;
 
   detailsModal.classList.remove('hidden');

@@ -9,7 +9,7 @@ const RECOMMENDED_ITEM_TYPES = ['product', 'kit', 'service'];
 
 async function createProduct(req, res) {
   try {
-    const { name, category, price, cost, description, image_url } = req.body || {};
+    const { name, category, price, cost, stock, is_out_of_stock, description, image_url } = req.body || {};
 
     if (!requiredString(name) || !requiredString(category) || !validateNumber(price) || !validateNumber(cost)) {
       return res.status(400).json({ success: false, error: 'name, category, price, and cost are required.' });
@@ -17,11 +17,20 @@ async function createProduct(req, res) {
 
     const result = await query(
       `
-      INSERT INTO products (name, category, price, cost, description, image_url)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
       `,
-      [name.trim(), category.trim(), price, cost, description?.trim() || '', image_url?.trim() || null]
+      [
+        name.trim(),
+        category.trim(),
+        price,
+        cost,
+        Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : 0,
+        Boolean(is_out_of_stock),
+        description?.trim() || '',
+        image_url?.trim() || null
+      ]
     );
 
     return res.status(201).json({ success: true, product: result.rows[0] });
@@ -34,7 +43,7 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, category, price, cost, description, image_url } = req.body || {};
+    const { name, category, price, cost, stock, is_out_of_stock, description, image_url } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid product id.' });
@@ -47,8 +56,10 @@ async function updateProduct(req, res) {
           category = COALESCE($3, category),
           price = COALESCE($4, price),
           cost = COALESCE($5, cost),
-          description = COALESCE($6, description),
-          image_url = COALESCE($7, image_url)
+          stock = COALESCE($6, stock),
+          is_out_of_stock = COALESCE($7, is_out_of_stock),
+          description = COALESCE($8, description),
+          image_url = COALESCE($9, image_url)
       WHERE id = $1
       RETURNING *;
       `,
@@ -58,6 +69,8 @@ async function updateProduct(req, res) {
         requiredString(category) ? category.trim() : null,
         validateNumber(price) ? price : null,
         validateNumber(cost) ? cost : null,
+        Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : null,
+        typeof is_out_of_stock === 'boolean' ? is_out_of_stock : null,
         requiredString(description) ? description.trim() : null,
         requiredString(image_url) ? image_url.trim() : null
       ]
@@ -90,7 +103,9 @@ async function deleteProduct(req, res) {
 
 async function createKit(req, res) {
   try {
-    const { name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url } = req.body || {};
+    const {
+      name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, video_url
+    } = req.body || {};
 
     if (
       !requiredString(name) ||
@@ -107,14 +122,16 @@ async function createKit(req, res) {
 
     const result = await query(
       `
-      INSERT INTO kits (name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO kits (name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, video_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *;
       `,
       [
         name.trim(),
         category,
         price,
+        Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : 0,
+        Boolean(is_out_of_stock),
         difficulty.trim(),
         requires_technician,
         description?.trim() || '',
@@ -138,7 +155,7 @@ async function updateKit(req, res) {
   try {
     const id = Number(req.params.id);
     const {
-      name, category, price, difficulty, requires_technician, description, instructions, image_url, video_url
+      name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, video_url
     } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -151,12 +168,14 @@ async function updateKit(req, res) {
       SET name = COALESCE($2, name),
           category = COALESCE($3, category),
           price = COALESCE($4, price),
-          difficulty = COALESCE($5, difficulty),
-          requires_technician = COALESCE($6, requires_technician),
-          description = COALESCE($7, description),
-          instructions = COALESCE($8, instructions),
-          image_url = COALESCE($9, image_url),
-          video_url = COALESCE($10, video_url)
+          stock = COALESCE($5, stock),
+          is_out_of_stock = COALESCE($6, is_out_of_stock),
+          difficulty = COALESCE($7, difficulty),
+          requires_technician = COALESCE($8, requires_technician),
+          description = COALESCE($9, description),
+          instructions = COALESCE($10, instructions),
+          image_url = COALESCE($11, image_url),
+          video_url = COALESCE($12, video_url)
       WHERE id = $1
       RETURNING *;
       `,
@@ -165,6 +184,8 @@ async function updateKit(req, res) {
         requiredString(name) ? name.trim() : null,
         validateEnum(category, KIT_CATEGORIES) ? category : null,
         validateNumber(price) ? price : null,
+        Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : null,
+        typeof is_out_of_stock === 'boolean' ? is_out_of_stock : null,
         requiredString(difficulty) ? difficulty.trim() : null,
         typeof requires_technician === 'boolean' ? requires_technician : null,
         requiredString(description) ? description.trim() : null,
@@ -202,7 +223,7 @@ async function deleteKit(req, res) {
 
 async function createService(req, res) {
   try {
-    const { name, description, price } = req.body || {};
+    const { name, description, price, image_url } = req.body || {};
 
     if (!requiredString(name) || !validateNumber(price)) {
       return res.status(400).json({ success: false, error: 'name and price are required.' });
@@ -210,11 +231,11 @@ async function createService(req, res) {
 
     const result = await query(
       `
-      INSERT INTO services (name, description, price)
-      VALUES ($1, $2, $3)
+      INSERT INTO services (name, description, price, image_url)
+      VALUES ($1, $2, $3, $4)
       RETURNING *;
       `,
-      [name.trim(), description?.trim() || '', price]
+      [name.trim(), description?.trim() || '', price, image_url?.trim() || null]
     );
 
     return res.status(201).json({ success: true, service: result.rows[0] });
@@ -227,7 +248,7 @@ async function createService(req, res) {
 async function updateService(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, description, price } = req.body || {};
+    const { name, description, price, image_url } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid service id.' });
@@ -238,7 +259,8 @@ async function updateService(req, res) {
       UPDATE services
       SET name = COALESCE($2, name),
           description = COALESCE($3, description),
-          price = COALESCE($4, price)
+          price = COALESCE($4, price),
+          image_url = COALESCE($5, image_url)
       WHERE id = $1
       RETURNING *;
       `,
@@ -246,7 +268,8 @@ async function updateService(req, res) {
         id,
         requiredString(name) ? name.trim() : null,
         requiredString(description) ? description.trim() : null,
-        validateNumber(price) ? price : null
+        validateNumber(price) ? price : null,
+        requiredString(image_url) ? image_url.trim() : null
       ]
     );
 
@@ -272,6 +295,59 @@ async function deleteService(req, res) {
   } catch (error) {
     console.error('[DELETE /admin/service/:id] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to delete service.' });
+  }
+}
+
+async function listTechBookings(_req, res) {
+  try {
+    const result = await query(
+      `
+      SELECT id, client_name, contact, address, problem_description, status, assigned_technician, created_at
+      FROM tech_bookings
+      ORDER BY created_at DESC;
+      `
+    );
+    return res.json({ success: true, bookings: result.rows });
+  } catch (error) {
+    console.error('[GET /admin/bookings] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load tech bookings.' });
+  }
+}
+
+async function updateTechBooking(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const status = req.body?.status?.toString().trim();
+    const assignedTechnician = req.body?.assigned_technician?.toString().trim();
+    const allowedStatuses = ['pending', 'in_progress', 'completed'];
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid booking id.' });
+    }
+
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid booking status.' });
+    }
+
+    const result = await query(
+      `
+      UPDATE tech_bookings
+      SET status = COALESCE($2, status),
+          assigned_technician = COALESCE($3, assigned_technician)
+      WHERE id = $1
+      RETURNING *;
+      `,
+      [id, status || null, assignedTechnician || null]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ success: false, error: 'Tech booking not found.' });
+    }
+
+    return res.json({ success: true, booking: result.rows[0] });
+  } catch (error) {
+    console.error('[PUT /admin/bookings/:id] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to update tech booking.' });
   }
 }
 
@@ -327,7 +403,8 @@ async function uploadImage(req, res) {
     return res.status(400).json({ success: false, error: 'File upload is required.' });
   }
 
-  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  const uploadSubdir = req.params.type || 'common';
+  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${uploadSubdir}/${req.file.filename}`;
   return res.status(201).json({ success: true, imageUrl });
 }
 
@@ -742,6 +819,8 @@ module.exports = {
   createService,
   updateService,
   deleteService,
+  listTechBookings,
+  updateTechBooking,
   listUsers,
   dashboard,
   getAdminSettings,

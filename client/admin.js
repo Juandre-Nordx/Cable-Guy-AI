@@ -12,6 +12,7 @@ const state = {
   products: [],
   kits: [],
   services: [],
+  bookings: [],
   settings: {
     currency: 'ZAR'
   },
@@ -44,6 +45,7 @@ function bindLayoutEvents() {
   document.getElementById('refresh-products').addEventListener('click', loadProducts);
   document.getElementById('refresh-kits').addEventListener('click', loadKits);
   document.getElementById('refresh-services').addEventListener('click', loadServices);
+  document.getElementById('refresh-bookings').addEventListener('click', loadTechBookings);
   document.getElementById('refresh-settings').addEventListener('click', loadSettings);
   document.getElementById('refresh-wizard').addEventListener('click', loadWizardBuilder);
   document.getElementById('wizard-add-node').addEventListener('click', createWizardNodeDraft);
@@ -68,7 +70,7 @@ function bindFormEvents() {
 
 async function bootAdmin() {
   try {
-    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadSettings(), loadWizardBuilder()]);
+    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadTechBookings(), loadSettings(), loadWizardBuilder()]);
     setGlobalMessage('Admin dashboard loaded.', 'success');
   } catch (error) {
     console.error('[Admin] boot failed:', error);
@@ -216,6 +218,26 @@ function renderOrdersTable() {
 document.addEventListener('click', async (event) => {
   const updateBtn = event.target.closest('[data-update-order]');
   const toggleNotesBtn = event.target.closest('[data-toggle-notes]');
+  const updateBookingBtn = event.target.closest('[data-update-booking]');
+
+  if (updateBookingBtn) {
+    const bookingId = updateBookingBtn.dataset.updateBooking;
+    const status = document.querySelector(`[data-booking-status="${bookingId}"]`)?.value;
+    const assigned_technician = document.querySelector(`[data-booking-tech="${bookingId}"]`)?.value?.trim() || null;
+
+    try {
+      await apiFetch(`/admin/bookings/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, assigned_technician })
+      });
+      setGlobalMessage(`Tech booking #${bookingId} updated.`, 'success');
+      await loadTechBookings();
+    } catch (error) {
+      setGlobalMessage(error.message, 'warning');
+    }
+    return;
+  }
 
   if (updateBtn) {
     const orderId = updateBtn.dataset.updateOrder;
@@ -314,7 +336,7 @@ async function submitProduct(event) {
 
   try {
     if (image && image.size > 0) {
-      imageUrl = await uploadImage(image);
+      imageUrl = await uploadImage(image, 'products');
       console.log('[Admin] image uploaded:', imageUrl);
     }
 
@@ -323,6 +345,8 @@ async function submitProduct(event) {
       category: formData.get('category')?.toString().trim(),
       price: Number(formData.get('price')),
       cost: Number(formData.get('cost')),
+      stock: Number(formData.get('stock') || 0),
+      is_out_of_stock: formData.get('is_out_of_stock') === 'on',
       description: formData.get('description')?.toString().trim() || '',
       image_url: imageUrl || null
     };
@@ -354,13 +378,15 @@ async function submitKit(event) {
   try {
     const image = data.get('image');
     if (image && image.size > 0) {
-      imageUrl = await uploadImage(image);
+      imageUrl = await uploadImage(image, 'kits');
     }
 
     const payload = {
       name: data.get('name')?.toString().trim(),
       category: data.get('category')?.toString(),
       price: Number(data.get('price')),
+      stock: Number(data.get('stock') || 0),
+      is_out_of_stock: data.get('is_out_of_stock') === 'on',
       difficulty: data.get('difficulty')?.toString(),
       requires_technician: data.get('requires_technician') === 'on',
       description: data.get('description')?.toString().trim() || '',
@@ -398,6 +424,11 @@ async function submitService(event) {
   };
 
   try {
+    const image = data.get('image');
+    if (image && image.size > 0) {
+      payload.image_url = await uploadImage(image, 'services');
+    }
+
     await apiFetch(editId ? `/admin/service/${editId}` : '/admin/service', {
       method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -413,11 +444,24 @@ async function submitService(event) {
   }
 }
 
-async function uploadImage(file) {
+function validateImageFile(file) {
+  if (!file || file.size <= 0) return;
+  const maxSize = 5 * 1024 * 1024;
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error('Only JPG, PNG, and WEBP images are allowed.');
+  }
+  if (file.size > maxSize) {
+    throw new Error('Image must be 5MB or smaller.');
+  }
+}
+
+async function uploadImage(file, type = 'common') {
+  validateImageFile(file);
   const payload = new FormData();
   payload.append('image', file);
 
-  const response = await fetch('/admin/upload', {
+  const response = await fetch(`/admin/upload/${type}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${session.token}` },
     body: payload
@@ -450,6 +494,7 @@ function renderProductsTable() {
         <td>${product.name}</td>
         <td>${product.category}</td>
         <td>${formatPrice(product.price, product.currency)}</td>
+        <td>${Number(product.stock) > 0 && !product.is_out_of_stock ? '✅ In Stock' : '❌ Out of Stock'}</td>
         <td>${product.image_url ? `<a href="${product.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
         <td>
           <div class="admin-order-actions">
@@ -463,7 +508,7 @@ function renderProductsTable() {
     .join('');
 
   document.getElementById('products-table-wrap').innerHTML = state.products.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No products found.</p>';
 
   document.querySelectorAll('[data-edit-product]').forEach((button) => {
@@ -492,6 +537,7 @@ function renderKitsTable() {
         <td>${kit.name}</td>
         <td>${kit.category}</td>
         <td>${formatPrice(kit.price, kit.currency)}</td>
+        <td>${Number(kit.stock) > 0 && !kit.is_out_of_stock ? '✅ In Stock' : '❌ Out of Stock'}</td>
         <td>${kit.difficulty}</td>
         <td>${kit.requires_technician ? 'Yes' : 'No'}</td>
         <td>${kit.instructions ? 'Included' : '-'}</td>
@@ -509,7 +555,7 @@ function renderKitsTable() {
     .join('');
 
   document.getElementById('kits-table-wrap').innerHTML = state.kits.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Difficulty</th><th>Technician</th><th>Guide</th><th>Image</th><th>Video</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No kits found.</p>';
 
   document.querySelectorAll('[data-edit-kit]').forEach((button) => {
@@ -536,6 +582,12 @@ async function loadSettings() {
   if (form) {
     form.elements.currency.value = state.settings.currency;
   }
+}
+
+async function loadTechBookings() {
+  const payload = await apiFetch('/admin/bookings');
+  state.bookings = payload.bookings || [];
+  renderTechBookingsTable();
 }
 
 async function submitSettings(event) {
@@ -568,6 +620,7 @@ function renderServicesTable() {
         <td>${service.name}</td>
         <td>${service.description}</td>
         <td>${formatPrice(service.price, service.currency || state.settings.currency)}</td>
+        <td>${service.image_url ? `<a href="${service.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
         <td>
           <div class="admin-order-actions">
             <button class="button secondary" type="button" data-edit-service="${service.id}">Edit</button>
@@ -580,7 +633,7 @@ function renderServicesTable() {
     .join('');
 
   document.getElementById('services-table-wrap').innerHTML = state.services.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Price</th><th>Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No services found.</p>';
 
   document.querySelectorAll('[data-edit-service]').forEach((button) => {
@@ -589,6 +642,40 @@ function renderServicesTable() {
   document.querySelectorAll('[data-delete-service]').forEach((button) => {
     button.addEventListener('click', () => deleteService(Number(button.dataset.deleteService)));
   });
+}
+
+function renderTechBookingsTable() {
+  const rows = state.bookings
+    .map(
+      (booking) => `
+      <tr>
+        <td>${booking.client_name}</td>
+        <td>${booking.contact}</td>
+        <td>${booking.address}</td>
+        <td>
+          <details>
+            <summary>View</summary>
+            <p>${escapeHtml(booking.problem_description || '')}</p>
+          </details>
+        </td>
+        <td>${new Date(booking.created_at).toLocaleString()}</td>
+        <td>
+          <select data-booking-status="${booking.id}">
+            ${['pending', 'in_progress', 'completed']
+              .map((status) => `<option value="${status}" ${booking.status === status ? 'selected' : ''}>${status}</option>`)
+              .join('')}
+          </select>
+        </td>
+        <td><input type="text" data-booking-tech="${booking.id}" value="${escapeHtml(booking.assigned_technician || '')}" placeholder="Optional" /></td>
+        <td><button class="button secondary" type="button" data-update-booking="${booking.id}">Save</button></td>
+      </tr>
+    `
+    )
+    .join('');
+
+  document.getElementById('bookings-table-wrap').innerHTML = state.bookings.length
+    ? `<table><thead><tr><th>Client</th><th>Contact</th><th>Address</th><th>Problem</th><th>Date Requested</th><th>Status</th><th>Assigned Technician</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`
+    : '<p class="subtext">No tech requests found.</p>';
 }
 
 function resetEntityForm(formId, saveButtonId, defaultLabel, cancelButtonId) {
@@ -612,6 +699,8 @@ function startEditProduct(id) {
   form.elements.category.value = product.category || '';
   form.elements.price.value = product.price ?? '';
   form.elements.cost.value = product.cost ?? '';
+  form.elements.stock.value = product.stock ?? 0;
+  form.elements.is_out_of_stock.checked = Boolean(product.is_out_of_stock);
   form.elements.description.value = product.description || '';
   document.getElementById('product-save-button').textContent = 'Update Product';
   document.getElementById('product-cancel-edit').classList.remove('hidden');
@@ -637,6 +726,8 @@ function startEditKit(id) {
   form.elements.name.value = kit.name || '';
   form.elements.category.value = kit.category || 'home';
   form.elements.price.value = kit.price ?? '';
+  form.elements.stock.value = kit.stock ?? 0;
+  form.elements.is_out_of_stock.checked = Boolean(kit.is_out_of_stock);
   form.elements.difficulty.value = kit.difficulty || 'easy';
   form.elements.requires_technician.checked = Boolean(kit.requires_technician);
   form.elements.description.value = kit.description || '';

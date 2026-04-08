@@ -44,17 +44,25 @@ async function normalizeOrderItems(rawItems, client) {
 
   for (const item of merged.values()) {
     const tableName = ORDERABLE_TABLES[item.type];
-    const result = await client.query(`SELECT id, name, price FROM ${tableName} WHERE id = $1 LIMIT 1;`, [item.item_id]);
+    const result = await client.query(
+      `SELECT id, name, price, COALESCE(stock, 0) AS stock, COALESCE(is_out_of_stock, false) AS is_out_of_stock FROM ${tableName} WHERE id = $1 LIMIT 1;`,
+      [item.item_id]
+    );
     const row = result.rows[0];
 
     if (!row) {
       throw new Error(`Item not found for ${item.type} #${item.item_id}.`);
     }
 
+    if (item.type !== 'service' && (row.is_out_of_stock || Number(row.stock) < item.qty)) {
+      throw new Error(`${row.name} is out of stock.`);
+    }
+
     validated.push({
       ...item,
       name: row.name,
-      price: Number(row.price)
+      price: Number(row.price),
+      stock: Number(row.stock || 0)
     });
   }
 
@@ -96,6 +104,18 @@ async function createOrder(req, res) {
         `,
         [order.id, item.item_id, item.type, item.qty, item.price]
       );
+
+      if (item.type === 'product' || item.type === 'kit') {
+        const tableName = ORDERABLE_TABLES[item.type];
+        await client.query(
+          `
+          UPDATE ${tableName}
+          SET stock = GREATEST(stock - $2, 0)
+          WHERE id = $1;
+          `,
+          [item.item_id, item.qty]
+        );
+      }
     }
 
     await client.query('COMMIT');

@@ -55,6 +55,8 @@ function addToCart(item) {
 }
 
 function renderStoreCard(item, type, isRecommended = false) {
+  const canTrackStock = type === 'product' || type === 'kit';
+  const isOutOfStock = canTrackStock && (Boolean(item.is_out_of_stock) || Number(item.stock || 0) <= 0);
   const card = document.createElement('article');
   card.className = `card product-card ${isRecommended ? 'recommended' : ''}`;
   card.id = `${type}-card-${item.id}`;
@@ -64,11 +66,13 @@ function renderStoreCard(item, type, isRecommended = false) {
     <h3>${escapeHtml(item.name)}</h3>
     <p class="subtext">${escapeHtml(item.description || '')}</p>
     <p><strong>Price:</strong> ${formatCurrency(item.price, item.currency)}</p>
+    ${canTrackStock ? `<p><span class="stock-badge ${isOutOfStock ? 'out' : 'in'}">${isOutOfStock ? '❌ Out of Stock' : '✅ In Stock'}</span></p>` : ''}
     <div class="kit-card-actions">
       <button class="button secondary details-btn" type="button" data-id="${item.id}" data-type="${type}">More Details</button>
       <button
         class="button primary add-to-cart-btn"
         type="button"
+        ${isOutOfStock ? 'disabled' : ''}
         data-id="${item.id}"
         data-type="${type}"
         data-name="${escapeHtml(item.name)}"

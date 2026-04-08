@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS products (
   category TEXT NOT NULL,
   price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
   cost NUMERIC(10,2) NOT NULL CHECK (cost >= 0),
+  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE,
   description TEXT NOT NULL DEFAULT '',
   image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -28,6 +30,8 @@ CREATE TABLE IF NOT EXISTS kits (
   name TEXT NOT NULL,
   category TEXT NOT NULL,
   price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE,
   difficulty TEXT NOT NULL,
   requires_technician BOOLEAN NOT NULL DEFAULT FALSE,
   description TEXT NOT NULL DEFAULT '',
@@ -40,6 +44,10 @@ CREATE TABLE IF NOT EXISTS kits (
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS instructions TEXT NOT NULL DEFAULT '';
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS video_url TEXT;
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Backward-safe migration for renamed kit field
 DO $$
@@ -95,8 +103,10 @@ CREATE TABLE IF NOT EXISTS services (
   name TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE services ADD COLUMN IF NOT EXISTS image_url TEXT;
 
 CREATE TABLE IF NOT EXISTS settings (
   id SERIAL PRIMARY KEY,
@@ -156,6 +166,24 @@ CREATE TABLE IF NOT EXISTS bookings (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'done')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS tech_bookings (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kit_id INTEGER REFERENCES kits(id) ON DELETE SET NULL,
+  client_name TEXT NOT NULL,
+  contact TEXT NOT NULL,
+  address TEXT NOT NULL,
+  problem_description TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  assigned_technician TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO tech_bookings (user_id, kit_id, client_name, contact, address, problem_description, status, created_at)
+SELECT user_id, kit_id, name, phone, address, '', 'pending', created_at
+FROM bookings
+WHERE NOT EXISTS (SELECT 1 FROM tech_bookings);
 
 CREATE TABLE IF NOT EXISTS wizard_nodes (
   id SERIAL PRIMARY KEY,

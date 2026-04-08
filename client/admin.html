@@ -21,6 +21,7 @@
           <button class="admin-nav-link" data-target="products-section">Products</button>
           <button class="admin-nav-link" data-target="kits-section">Kits</button>
           <button class="admin-nav-link" data-target="services-section">Services</button>
+          <button class="admin-nav-link" data-target="bookings-section">Tech Requests</button>
           <button class="admin-nav-link" data-target="settings-section">System Settings</button>
           <button class="admin-nav-link" data-target="wizard-section">Wizard Builder</button>
         </nav>
@@ -77,6 +78,11 @@
               <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
               <label>Cost<input type="number" name="cost" min="0" step="0.01" required /></label>
               <label>Description<textarea name="description" rows="3"></textarea></label>
+              <label>Stock Quantity<input type="number" name="stock" min="0" step="1" value="0" /></label>
+              <label class="checkbox-row">
+                <input type="checkbox" name="is_out_of_stock" />
+                Mark as Out of Stock
+              </label>
               <label>Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
               <div class="kit-card-actions">
                 <button class="button primary" type="submit" id="product-save-button">Save Product</button>
@@ -127,6 +133,11 @@
                 Requires technician
               </label>
               <label>Description<textarea name="description" rows="3"></textarea></label>
+              <label>Stock Quantity<input type="number" name="stock" min="0" step="1" value="0" /></label>
+              <label class="checkbox-row">
+                <input type="checkbox" name="is_out_of_stock" />
+                Mark as Out of Stock
+              </label>
               <label>Instructions<textarea name="instructions" rows="5" placeholder="Installation and setup guidance"></textarea></label>
               <label>Installation Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
               <label>Video URL<input type="url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." /></label>
@@ -150,11 +161,12 @@
         <section id="services-section" class="admin-section hidden">
           <article class="card">
             <h3>Add Service</h3>
-            <form id="service-form" class="stack-form">
+            <form id="service-form" class="stack-form" enctype="multipart/form-data">
               <input type="hidden" name="id" />
               <label>Name<input type="text" name="name" required /></label>
               <label>Description<textarea name="description" rows="3"></textarea></label>
               <label>Price<input type="number" name="price" min="0" step="0.01" required /></label>
+              <label>Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
               <div class="kit-card-actions">
                 <button class="button primary" type="submit" id="service-save-button">Save Service</button>
                 <button class="button secondary hidden" type="button" id="service-cancel-edit">Cancel</button>
@@ -169,6 +181,16 @@
               <button class="button secondary" id="refresh-services">Refresh</button>
             </div>
             <div id="services-table-wrap"></div>
+          </article>
+        </section>
+
+        <section id="bookings-section" class="admin-section hidden">
+          <article class="card mt-16">
+            <div class="section-header-row">
+              <h3>Tech Requests</h3>
+              <button class="button secondary" id="refresh-bookings">Refresh</button>
+            </div>
+            <div id="bookings-table-wrap"></div>
           </article>
         </section>
 

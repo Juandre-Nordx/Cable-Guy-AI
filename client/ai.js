@@ -16,6 +16,7 @@ const bookingSection = document.getElementById('booking-section');
 const bookingForm = document.getElementById('booking-form');
 const bookingResult = document.getElementById('booking-result');
 const bookingKitId = document.getElementById('booking-kit-id');
+const bookingSubmitButton = document.getElementById('booking-submit-button');
 const wizardState = {
   rootNodeId: null,
   currentNodeId: null,
@@ -298,6 +299,7 @@ if (session) {
       name: document.getElementById('booking-name').value.trim(),
       phone: document.getElementById('booking-phone').value.trim(),
       address: document.getElementById('booking-address').value.trim(),
+      problem_description: document.getElementById('booking-problem-description').value.trim(),
       kit_id: Number(document.getElementById('booking-kit-id').value || 0)
     };
 
@@ -306,15 +308,32 @@ if (session) {
     }
 
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      bookingResult.className = 'subtext';
+      bookingResult.textContent = 'Submitting booking...';
+      if (bookingSubmitButton) bookingSubmitButton.disabled = true;
+
       const response = await fetch('/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(body)
       });
 
       const payload = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login.html';
+          return;
+        }
         throw new Error(payload.error || 'Booking request failed.');
       }
 
@@ -324,6 +343,8 @@ if (session) {
     } catch (error) {
       bookingResult.textContent = `Error: ${error.message}`;
       bookingResult.className = 'warning';
+    } finally {
+      if (bookingSubmitButton) bookingSubmitButton.disabled = false;
     }
   });
 

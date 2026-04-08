@@ -14,6 +14,8 @@ const {
   createService,
   updateService,
   deleteService,
+  listTechBookings,
+  updateTechBooking,
   listUsers,
   dashboard,
   getAdminSettings,
@@ -35,7 +37,14 @@ if (!fs.existsSync(config.uploadDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, config.uploadDir),
+  destination: (req, _file, cb) => {
+    const uploadSubdir = req.params.type || req.body?.type || 'common';
+    const targetDir = path.join(config.uploadDir, uploadSubdir);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    cb(null, targetDir);
+  },
   filename: (_req, file, cb) => {
     const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     cb(null, `${Date.now()}-${safeOriginal}`);
@@ -75,7 +84,9 @@ router.delete('/kit/:id', deleteKit);
 router.post('/service', createService);
 router.put('/service/:id', updateService);
 router.delete('/service/:id', deleteService);
-router.post('/upload', upload.single('image'), uploadImage);
+router.get('/bookings', listTechBookings);
+router.put('/bookings/:id', updateTechBooking);
+router.post('/upload/:type', upload.single('image'), uploadImage);
 router.get('/wizard/nodes', listWizardNodes);
 router.post('/wizard/node', createWizardNode);
 router.put('/wizard/node/:id', updateWizardNode);

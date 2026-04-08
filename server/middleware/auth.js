@@ -13,6 +13,9 @@ function authenticate(req, res, next) {
     req.user = jwt.verify(token, config.jwtSecret);
     return next();
   } catch (error) {
+    if (error?.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, error: 'Session expired. Please login again.' });
+    }
     return res.status(401).json({ success: false, error: 'Invalid or expired token.' });
   }
 }

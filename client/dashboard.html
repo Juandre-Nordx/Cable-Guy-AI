@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Dashboard | Cable Guy AI</title>
+    <title>Store Dashboard | Cable Guy AI</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -18,16 +18,39 @@
       </nav>
     </header>
 
-    <main>
+    <main class="narrow">
       <section class="card">
         <h1 id="welcome">Welcome</h1>
-        <p class="subtext">Track your latest orders below.</p>
-        <div class="hero-actions">
-          <a class="button primary" href="/ai.html">Try AI Assistant</a>
-        </div>
+        <p class="subtext">Your Store Dashboard is ready. Chat with the assistant and shop the best-fit kits below.</p>
+      </section>
+
+      <section id="chat-shell" class="chat-shell card">
+        <h2>AI WiFi Diagnosis</h2>
+        <p class="subtext">Describe your issue. The assistant will ask follow-up questions and recommend a next step.</p>
+
+        <div id="chat" class="chat-log"></div>
+
+        <form id="chat-form" class="chat-form">
+          <input id="message-input" type="text" placeholder="My WiFi drops in the bedroom..." required />
+          <button id="send-button" type="submit" class="button primary">Send</button>
+        </form>
       </section>
 
       <section class="card">
+        <h2>Recommended Kits for You</h2>
+        <div id="recommended-kits" class="dashboard-kit-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>Quick Actions</h2>
+        <div class="quick-actions-grid">
+          <a class="button secondary" href="#orders-section">View Orders</a>
+          <a class="button secondary" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Book Install</a>
+          <a class="button secondary" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Contact Support</a>
+        </div>
+      </section>
+
+      <section id="orders-section" class="card">
         <h2>My Orders</h2>
         <div id="orders-list" class="stack-form"></div>
       </section>

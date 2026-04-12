@@ -3,86 +3,103 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cable Guy AI | Smarter Network Support</title>
+    <title>Cable Guy | WiFi & Security Kits</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="top-nav">
-      <a class="brand" href="/index.html">Cable Guy AI</a>
+      <a class="brand" href="/index.html">Cable Guy</a>
       <nav>
         <a href="/index.html" class="active">Home</a>
-        <a href="/ai.html">AI Assistant</a>
-        <a href="/login.html">Login / Register</a>
         <a href="/store.html" data-store-link>Store</a>
+        <a href="/login.html">Login / Register</a>
       </nav>
     </header>
 
-    <main>
-      <section class="hero">
-        <div>
-          <p class="eyebrow">Know Your Network. Solve More Yourself.</p>
-          <h1>Learn faster, troubleshoot smarter, and only call a technician when truly needed.</h1>
-          <p>
-            Cable Guy AI helps you understand common network problems, choose the right products,
-            and get pre-configured kits that are ready to install.
-          </p>
-          <div class="hero-actions">
-            <a class="button primary" href="/register.html">Create Account</a>
-            <a class="button secondary" href="/login.html">Login</a>
-            <a class="button secondary" href="/ai.html">Try AI Assistant</a>
-          </div>
+    <main class="landing-main">
+      <section class="hero" id="hero">
+        <p class="eyebrow">Fast, reliable home connectivity</p>
+        <h1>Fix Your WiFi &amp; Security Today</h1>
+        <p class="hero-subtitle">
+          No more weak signal. No more guessing. Get the right kit for your home — fast.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary large" href="/store.html" data-store-link>Shop Kits</a>
+          <a class="button whatsapp large" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
         </div>
       </section>
 
-      <section class="card educational-section">
-        <h2>Know Your Network. Fix It Yourself.</h2>
-        <p>
-          We are here to solve a real problem. Many call-outs are for simple issues like unplugged
-          devices or basic setup mistakes.
-        </p>
-        <p>
-          Our goal is to empower you to understand your network, fix simple problems yourself, and
-          only call a technician when truly needed.
-        </p>
-      </section>
-
-      <section class="feature-grid value-grid" aria-label="Core value sections">
-        <article class="card">
-          <h2>AI Network Assistant</h2>
-          <p>
-            We have an AI that helps you diagnose and fix basic network problems without needing a
-            technician.
-          </p>
-        </article>
-
-        <article class="card">
-          <h2>Network Store</h2>
-          <p>
-            We offer a store with all the products you may need for your network builds.
-          </p>
-        </article>
-
-        <article class="card">
-          <h2>Pre-Configured Kits</h2>
-          <p>
-            We build custom kits that you can install yourself. They are pre-configured to your
-            needs so you can save money and avoid technician call-outs.
-          </p>
-        </article>
-      </section>
-
-      <section class="card preview-section" aria-labelledby="preview-title">
-        <div class="preview-header">
-          <h2 id="preview-title">Popular Kits &amp; Products</h2>
-          <p class="subtext">Preview available options now. Login is required to view full details and purchase.</p>
+      <section class="kits-section" id="kits">
+        <div class="section-heading">
+          <h2>Choose the Right Kit for Your Home</h2>
+          <p>Designed by a real technician to solve the most common WiFi and security problems.</p>
         </div>
-        <p id="preview-error" class="warning hidden" role="status"></p>
 
-        <h3 class="section-subheading">Popular Kits</h3>
-        <div id="kit-preview-grid" class="feature-grid"></div>
+        <div class="kits-grid">
+          <article class="card kit-card">
+            <img src="https://images.unsplash.com/photo-1545259741-2ea3ebf61fa3?auto=format&fit=crop&w=800&q=80" alt="Stay Online Kit UPS" loading="lazy" />
+            <h3>Stay Online Kit (UPS)</h3>
+            <p>Internet drops every time power cuts? Keep your router and key devices running during outages.</p>
+            <div class="card-actions">
+              <a class="button primary" href="/store.html" data-store-link>Buy Now</a>
+              <a class="button outline" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">WhatsApp / Book Install</a>
+            </div>
+          </article>
 
-        <h3 class="section-subheading">Popular Products</h3>
-        <div id="product-preview-grid" class="feature-grid"></div>
+          <article class="card kit-card">
+            <img src="https://images.unsplash.com/photo-1527443154391-507e9dc6c5cc?auto=format&fit=crop&w=800&q=80" alt="Room Boost Kit WiFi extender" loading="lazy" />
+            <h3>Room Boost Kit</h3>
+            <p>Dead zones in bedrooms or home office? Expand strong, stable WiFi to every room that matters.</p>
+            <div class="card-actions">
+              <a class="button primary" href="/store.html" data-store-link>Buy Now</a>
+              <a class="button outline" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">WhatsApp / Book Install</a>
+            </div>
+          </article>
+
+          <article class="card kit-card">
+            <img src="https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=800&q=80" alt="Home Security Kit cameras" loading="lazy" />
+            <h3>Home Security Kit</h3>
+            <p>Worried about blind spots around your home? Start with smart, easy coverage for doors and key areas.</p>
+            <div class="card-actions">
+              <a class="button primary" href="/store.html" data-store-link>Buy Now</a>
+              <a class="button outline" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">WhatsApp / Book Install</a>
+            </div>
+          </article>
+
+          <article class="card kit-card">
+            <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80" alt="Pro Security Kit complete setup" loading="lazy" />
+            <h3>Pro Security Kit</h3>
+            <p>Need complete protection and better remote monitoring? Get our full advanced setup for total peace of mind.</p>
+            <div class="card-actions">
+              <a class="button primary" href="/store.html" data-store-link>Buy Now</a>
+              <a class="button outline" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">WhatsApp / Book Install</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="why-section card" id="why-us">
+        <h2>Why Choose Us</h2>
+        <ul class="check-list">
+          <li>Real technician</li>
+          <li>Tested kits</li>
+          <li>Honest advice</li>
+          <li>Installation available</li>
+        </ul>
+      </section>
+
+      <section class="video-section card" id="videos">
+        <h2>See Our Kits in Action</h2>
+        <p>Watch quick setup guides and real customer installs.</p>
+        <div class="video-placeholder" role="img" aria-label="YouTube videos placeholder">
+          YouTube video placeholders
+        </div>
+      </section>
+
+      <section class="whatsapp-cta" id="whatsapp">
+        <h2>Need Help Choosing?</h2>
+        <p>Tell us your problem and we will recommend the right kit in minutes.</p>
+        <a class="button whatsapp large" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Chat on WhatsApp Now</a>
       </section>
     </main>
 

@@ -9,9 +9,9 @@
   <body>
     <div class="admin-layout">
       <aside class="admin-sidebar card">
-        <div>
+        <div class="admin-brand-block">
           <h1>Cable Guy</h1>
-          <p class="subtext">Super Admin Panel</p>
+          <p class="subtext">Admin Control Center</p>
         </div>
 
         <nav class="admin-nav" id="admin-nav">
@@ -31,16 +31,19 @@
 
       <main class="admin-main">
         <header class="card admin-header">
-          <h2 id="section-title">Dashboard</h2>
+          <div>
+            <p class="admin-kicker">Operations</p>
+            <h2 id="section-title">Dashboard</h2>
+          </div>
           <p id="global-message" class="subtext"></p>
         </header>
 
         <section id="dashboard-section" class="admin-section">
-          <div class="feature-grid">
-            <article class="card"><h3>Total Users</h3><p id="total-users">0</p></article>
-            <article class="card"><h3>Total Orders</h3><p id="total-orders">0</p></article>
-            <article class="card"><h3>Total Products</h3><p id="total-products">0</p></article>
-            <article class="card"><h3>Total Kits</h3><p id="total-kits">0</p></article>
+          <div class="feature-grid admin-metric-grid">
+            <article class="card admin-metric-card"><h3>Total Users</h3><p id="total-users">0</p></article>
+            <article class="card admin-metric-card"><h3>Total Orders</h3><p id="total-orders">0</p></article>
+            <article class="card admin-metric-card"><h3>Total Products</h3><p id="total-products">0</p></article>
+            <article class="card admin-metric-card"><h3>Total Kits</h3><p id="total-kits">0</p></article>
           </div>
           <article class="card mt-16">
             <h3>Orders by Status</h3>

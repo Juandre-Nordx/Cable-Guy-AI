@@ -535,6 +535,10 @@ textarea {
   overflow-y: auto;
 }
 
+.admin-tabs-left:not(:hover):not(:focus-within) .admin-nav-link:not(.active) {
+  display: none;
+}
+
 .admin-main {
   display: grid;
   gap: 1rem;

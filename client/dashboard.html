@@ -21,19 +21,20 @@
     <main class="narrow">
       <section class="card">
         <h1 id="welcome">Welcome</h1>
-        <p class="subtext">Your Store Dashboard is ready. Chat with the assistant and shop the best-fit kits below.</p>
+        <p class="subtext">Your Store Dashboard is ready. Use the diagnosis wizard and shop the best-fit kits below.</p>
       </section>
 
-      <section id="chat-shell" class="chat-shell card">
-        <h2>AI WiFi Diagnosis</h2>
-        <p class="subtext">Describe your issue. The assistant will ask follow-up questions and recommend a next step.</p>
+      <section id="wizard-shell" class="card">
+        <h2>WiFi Diagnosis Wizard</h2>
+        <p class="subtext">Answer a few quick questions and we will recommend the right next step.</p>
 
-        <div id="chat" class="chat-log"></div>
-
-        <form id="chat-form" class="chat-form">
-          <input id="message-input" type="text" placeholder="My WiFi drops in the bedroom..." required />
-          <button id="send-button" type="submit" class="button primary">Send</button>
+        <form id="wizard-form" class="stack-form">
+          <h3 id="wizard-question" class="section-subheading">Loading wizard...</h3>
+          <div id="wizard-options" class="feature-grid"></div>
+          <button id="wizard-reset" class="button secondary" type="button">Restart Wizard</button>
         </form>
+
+        <div id="wizard-result" class="hidden wizard-result"></div>
       </section>
 
       <section class="card">

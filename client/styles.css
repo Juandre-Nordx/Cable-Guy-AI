@@ -422,3 +422,13 @@ textarea {
   padding: 0.7rem;
   font-family: inherit;
 }
+
+.section-subheading {
+  margin: 0;
+}
+
+.wizard-result {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}

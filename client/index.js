@@ -1,4 +1,4 @@
-const storeLink = document.querySelector('[data-store-link]');
+const storeLinks = document.querySelectorAll('[data-store-link]');
 const kitPreviewGrid = document.getElementById('kit-preview-grid');
 const productPreviewGrid = document.getElementById('product-preview-grid');
 const previewError = document.getElementById('preview-error');
@@ -45,6 +45,10 @@ function createPreviewCard(item, type) {
 }
 
 function setPreviewError(message) {
+  if (!previewError) {
+    return;
+  }
+
   previewError.textContent = message;
   previewError.classList.remove('hidden');
 }
@@ -61,6 +65,10 @@ async function fetchCollection(url, key) {
 }
 
 async function loadLandingPreview() {
+  if (!kitPreviewGrid || !productPreviewGrid) {
+    return;
+  }
+
   try {
     const [kits, products] = await Promise.all([
       fetchCollection('/kits', 'kits'),
@@ -86,9 +94,11 @@ async function loadLandingPreview() {
   }
 }
 
-storeLink?.addEventListener('click', (event) => {
-  event.preventDefault();
-  goToStoreOrLogin();
+storeLinks.forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    goToStoreOrLogin();
+  });
 });
 
 loadLandingPreview();

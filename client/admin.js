@@ -89,6 +89,7 @@ function bindFormEvents() {
 async function bootAdmin() {
   try {
     await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadTechBookings(), loadSettings(), loadWizardBuilder()]);
+    activateSection(getInitialSectionFromQuery());
     setGlobalMessage('Admin dashboard loaded.', 'success');
   } catch (error) {
     console.error('[Admin] boot failed:', error);

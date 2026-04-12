@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Dashboard | Cable Guy AI</title>
+    <title>Store Dashboard | Cable Guy AI</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -18,16 +18,40 @@
       </nav>
     </header>
 
-    <main>
+    <main class="narrow">
       <section class="card">
         <h1 id="welcome">Welcome</h1>
-        <p class="subtext">Track your latest orders below.</p>
-        <div class="hero-actions">
-          <a class="button primary" href="/ai.html">Try AI Assistant</a>
-        </div>
+        <p class="subtext">Your Store Dashboard is ready. Use the diagnosis wizard and shop the best-fit kits below.</p>
+      </section>
+
+      <section id="wizard-shell" class="card">
+        <h2>WiFi Diagnosis Wizard</h2>
+        <p class="subtext">Answer a few quick questions and we will recommend the right next step.</p>
+
+        <form id="wizard-form" class="stack-form">
+          <h3 id="wizard-question" class="section-subheading">Loading wizard...</h3>
+          <div id="wizard-options" class="feature-grid"></div>
+          <button id="wizard-reset" class="button secondary" type="button">Restart Wizard</button>
+        </form>
+
+        <div id="wizard-result" class="hidden wizard-result"></div>
       </section>
 
       <section class="card">
+        <h2>Recommended Kits for You</h2>
+        <div id="recommended-kits" class="dashboard-kit-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>Quick Actions</h2>
+        <div class="quick-actions-grid">
+          <a class="button secondary" href="#orders-section">View Orders</a>
+          <a class="button secondary" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Book Install</a>
+          <a class="button secondary" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Contact Support</a>
+        </div>
+      </section>
+
+      <section id="orders-section" class="card">
         <h2>My Orders</h2>
         <div id="orders-list" class="stack-form"></div>
       </section>

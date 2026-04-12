@@ -62,6 +62,12 @@ main {
 .top-nav .brand {
   color: white;
   font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
 }
 
 .top-nav .active {
@@ -203,6 +209,25 @@ section p {
   border-radius: 10px;
   object-fit: cover;
   background: #f3f4f6;
+}
+
+.product-card img,
+.store-image-gallery img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f3f4f6;
+}
+
+.store-image-gallery {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.store-image-gallery.multi {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .kit-card h3 {

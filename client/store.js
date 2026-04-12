@@ -61,8 +61,27 @@ function renderStoreCard(item, type, isRecommended = false) {
   card.className = `card product-card ${isRecommended ? 'recommended' : ''}`;
   card.id = `${type}-card-${item.id}`;
 
+  const imageSources = getItemImageSources(item, type);
+  const imageMarkup = imageSources.length
+    ? `
+      <div class="store-image-gallery ${type === 'kit' || type === 'product' ? 'multi' : ''}">
+        ${imageSources
+          .map(
+            (src, index) => `
+              <img
+                src="${src}"
+                alt="${escapeHtml(item.name)} ${imageSources.length > 1 ? `image ${index + 1}` : ''}"
+                loading="lazy"
+                onerror="this.onerror=null;this.src='${DEFAULT_IMAGE_PLACEHOLDER}'"
+              />`
+          )
+          .join('')}
+      </div>
+    `
+    : '';
+
   card.innerHTML = `
-    ${item.image_url ? `<img src="${item.image_url}" alt="${escapeHtml(item.name)}" loading="lazy" />` : ''}
+    ${imageMarkup}
     <h3>${escapeHtml(item.name)}</h3>
     <p class="subtext">${escapeHtml(item.description || '')}</p>
     <p><strong>Price:</strong> ${formatCurrency(item.price, item.currency)}</p>
@@ -85,6 +104,36 @@ function renderStoreCard(item, type, isRecommended = false) {
   `;
 
   return card;
+}
+
+const DEFAULT_IMAGE_PLACEHOLDER = 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80';
+
+function normalizeImageValue(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  return [String(value).trim()].filter(Boolean);
+}
+
+function getItemImageSources(item, type) {
+  const candidates = [
+    ...normalizeImageValue(item.image_urls),
+    ...normalizeImageValue(item.images),
+    item.image_url,
+    item.image_url_2,
+    item.image_url_3
+  ]
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
+
+  const deduped = [...new Set(candidates)];
+
+  if ((type === 'kit' || type === 'product') && deduped.length === 1) {
+    return [deduped[0], DEFAULT_IMAGE_PLACEHOLDER];
+  }
+
+  return deduped;
 }
 
 function renderKits(kits) {
@@ -146,14 +195,25 @@ function renderSteps(steps) {
   `;
 }
 
-function openDetailsModal(item) {
+function openDetailsModal(item, type = 'product') {
   const hasSteps = Array.isArray(item.steps) && item.steps.length > 0;
   const hasInstructions = item.instructions && item.instructions.trim();
 
   document.getElementById('details-modal-title').textContent = item.name || 'Details';
 
   detailsModalBody.innerHTML = `
-    ${item.image_url ? `<img src="${item.image_url}" alt="${escapeHtml(item.name)}" class="kit-main-image" loading="lazy" />` : ''}
+    ${getItemImageSources(item, type)
+      .map(
+        (src, index) => `
+          <img
+            src="${src}"
+            alt="${escapeHtml(item.name)} ${index + 1}"
+            class="kit-main-image"
+            loading="lazy"
+            onerror="this.onerror=null;this.src='${DEFAULT_IMAGE_PLACEHOLDER}'"
+          />`
+      )
+      .join('')}
     <p class="details-description">${escapeHtml(item.description || '')}</p>
     ${item.video_url ? `<p class="details-video-link"><a href="${item.video_url}" target="_blank" rel="noopener noreferrer">▶ Watch video guide</a></p>` : ''}
     ${hasSteps
@@ -177,7 +237,7 @@ async function openDetails(id, type) {
       throw new Error(payload.error || 'Failed to load kit details.');
     }
 
-    openDetailsModal(payload.kit);
+    openDetailsModal(payload.kit, 'kit');
     return;
   }
 
@@ -187,7 +247,7 @@ async function openDetails(id, type) {
     throw new Error('Item details not found.');
   }
 
-  openDetailsModal(item);
+  openDetailsModal(item, type);
 }
 
 async function loadStore() {

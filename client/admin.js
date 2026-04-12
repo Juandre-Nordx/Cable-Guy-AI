@@ -28,6 +28,7 @@ const state = {
 };
 
 if (session) {
+  activateSection(getInitialSectionFromQuery());
   bindLayoutEvents();
   bindFormEvents();
   bootAdmin();

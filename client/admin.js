@@ -28,16 +28,34 @@ const state = {
 };
 
 if (session) {
+  activateSection(getInitialSectionFromQuery());
   bindLayoutEvents();
   bindFormEvents();
   bootAdmin();
 }
 
+const TAB_TO_SECTION = {
+  dashboard: 'dashboard-section',
+  users: 'users-section',
+  orders: 'orders-section',
+  products: 'products-section',
+  kits: 'kits-section',
+  services: 'services-section',
+  bookings: 'bookings-section',
+  settings: 'settings-section',
+  wizard: 'wizard-section'
+};
+
 function bindLayoutEvents() {
   document.getElementById('logout-button').addEventListener('click', logout);
 
-  document.querySelectorAll('.admin-nav-link').forEach((button) => {
-    button.addEventListener('click', () => activateSection(button.dataset.target));
+  document.querySelectorAll('.admin-nav-link').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      const targetSection = link.dataset.target || 'dashboard-section';
+      const tabKey = Object.entries(TAB_TO_SECTION).find(([, sectionId]) => sectionId === targetSection)?.[0] || 'dashboard';
+      window.location.assign(`/admin.html?tab=${tabKey}`);
+    });
   });
 
   document.getElementById('refresh-users').addEventListener('click', loadUsers);
@@ -76,6 +94,12 @@ async function bootAdmin() {
     console.error('[Admin] boot failed:', error);
     setGlobalMessage(error.message || 'Admin dashboard failed to load.', 'warning');
   }
+}
+
+function getInitialSectionFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab') || 'dashboard';
+  return TAB_TO_SECTION[tab] || 'dashboard-section';
 }
 
 function formatPrice(amount, currency = state.settings.currency || 'ZAR') {
@@ -331,13 +355,13 @@ async function submitProduct(event) {
   const formData = new FormData(form);
   const editId = Number(formData.get('id') || 0);
 
-  const image = formData.get('image');
-  let imageUrl = '';
+  const images = formData.getAll('image').filter((file) => file && file.size > 0);
+  let imageUrls = [];
 
   try {
-    if (image && image.size > 0) {
-      imageUrl = await uploadImage(image, 'products');
-      console.log('[Admin] image uploaded:', imageUrl);
+    if (images.length) {
+      imageUrls = await Promise.all(images.map((image) => uploadImage(image, 'products')));
+      console.log('[Admin] images uploaded:', imageUrls);
     }
 
     const productPayload = {
@@ -348,7 +372,8 @@ async function submitProduct(event) {
       stock: Number(formData.get('stock') || 0),
       is_out_of_stock: formData.get('is_out_of_stock') === 'on',
       description: formData.get('description')?.toString().trim() || '',
-      image_url: imageUrl || null
+      image_url: imageUrls[0] || null,
+      image_urls: imageUrls
     };
 
     await apiFetch(editId ? `/admin/product/${editId}` : '/admin/product', {
@@ -495,7 +520,7 @@ function renderProductsTable() {
         <td>${product.category}</td>
         <td>${formatPrice(product.price, product.currency)}</td>
         <td>${Number(product.stock) > 0 && !product.is_out_of_stock ? '✅ In Stock' : '❌ Out of Stock'}</td>
-        <td>${product.image_url ? `<a href="${product.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
+        <td>${Array.isArray(product.image_urls) && product.image_urls.length ? `${product.image_urls.length} photos` : product.image_url ? '1 photo' : '-'}</td>
         <td>
           <div class="admin-order-actions">
             <button class="button secondary" type="button" data-edit-product="${product.id}">Edit</button>
@@ -508,7 +533,7 @@ function renderProductsTable() {
     .join('');
 
   document.getElementById('products-table-wrap').innerHTML = state.products.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Photos</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No products found.</p>';
 
   document.querySelectorAll('[data-edit-product]').forEach((button) => {

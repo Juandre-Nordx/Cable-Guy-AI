@@ -13,18 +13,7 @@
           <h1>Cable Guy</h1>
           <p class="subtext">Admin Control Center</p>
         </div>
-
-        <nav class="admin-nav" id="admin-nav">
-          <button class="admin-nav-link active" data-target="dashboard-section">Dashboard</button>
-          <button class="admin-nav-link" data-target="users-section">Users</button>
-          <button class="admin-nav-link" data-target="orders-section">Orders</button>
-          <button class="admin-nav-link" data-target="products-section">Products</button>
-          <button class="admin-nav-link" data-target="kits-section">Kits</button>
-          <button class="admin-nav-link" data-target="services-section">Services</button>
-          <button class="admin-nav-link" data-target="bookings-section">Tech Requests</button>
-          <button class="admin-nav-link" data-target="settings-section">System Settings</button>
-          <button class="admin-nav-link" data-target="wizard-section">Wizard Builder</button>
-        </nav>
+        <p class="subtext">Use the tabs on the right to switch sections.</p>
 
         <button id="logout-button" class="button secondary">Logout</button>
       </aside>
@@ -37,6 +26,18 @@
           </div>
           <p id="global-message" class="subtext"></p>
         </header>
+
+        <nav class="admin-tabs" id="admin-nav" aria-label="Admin sections">
+          <button class="admin-nav-link active" data-target="dashboard-section">Dashboard</button>
+          <button class="admin-nav-link" data-target="users-section">Users</button>
+          <button class="admin-nav-link" data-target="orders-section">Orders</button>
+          <button class="admin-nav-link" data-target="products-section">Products</button>
+          <button class="admin-nav-link" data-target="kits-section">Kits</button>
+          <button class="admin-nav-link" data-target="services-section">Services</button>
+          <button class="admin-nav-link" data-target="bookings-section">Tech Requests</button>
+          <button class="admin-nav-link" data-target="settings-section">System Settings</button>
+          <button class="admin-nav-link" data-target="wizard-section">Wizard Builder</button>
+        </nav>
 
         <section id="dashboard-section" class="admin-section">
           <div class="feature-grid admin-metric-grid">
@@ -86,7 +87,8 @@
                 <input type="checkbox" name="is_out_of_stock" />
                 Mark as Out of Stock
               </label>
-              <label>Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
+              <label>Photos<input type="file" name="image" accept="image/png,image/jpeg,image/webp" multiple /></label>
+              <p class="subtext">You can upload multiple photos for each product.</p>
               <div class="kit-card-actions">
                 <button class="button primary" type="submit" id="product-save-button">Save Product</button>
                 <button class="button secondary hidden" type="button" id="product-cancel-edit">Cancel</button>

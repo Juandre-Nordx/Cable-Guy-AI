@@ -7,18 +7,26 @@ const WIZARD_NODE_TYPES = ['question', 'result'];
 const ALLOWED_CURRENCIES = ['ZAR', 'USD', 'EUR'];
 const RECOMMENDED_ITEM_TYPES = ['product', 'kit', 'service'];
 
+function sanitizeImageUrls(input) {
+  if (!Array.isArray(input)) return [];
+  return [...new Set(input.map((entry) => String(entry || '').trim()).filter(Boolean))];
+}
+
 async function createProduct(req, res) {
   try {
-    const { name, category, price, cost, stock, is_out_of_stock, description, image_url } = req.body || {};
+    const { name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls } = req.body || {};
 
     if (!requiredString(name) || !requiredString(category) || !validateNumber(price) || !validateNumber(cost)) {
       return res.status(400).json({ success: false, error: 'name, category, price, and cost are required.' });
     }
 
+    const normalizedImageUrls = sanitizeImageUrls(image_urls);
+    const primaryImageUrl = image_url?.trim() || normalizedImageUrls[0] || null;
+
     const result = await query(
       `
-      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
       RETURNING *;
       `,
       [
@@ -29,7 +37,8 @@ async function createProduct(req, res) {
         Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : 0,
         Boolean(is_out_of_stock),
         description?.trim() || '',
-        image_url?.trim() || null
+        primaryImageUrl,
+        JSON.stringify(normalizedImageUrls)
       ]
     );
 
@@ -43,11 +52,16 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, category, price, cost, stock, is_out_of_stock, description, image_url } = req.body || {};
+    const { name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid product id.' });
     }
+
+    const normalizedImageUrls = sanitizeImageUrls(image_urls);
+    const hasImageArray = Array.isArray(image_urls);
+    const hasImageUrl = requiredString(image_url);
+    const nextPrimaryImage = hasImageUrl ? image_url.trim() : normalizedImageUrls[0] || null;
 
     const result = await query(
       `
@@ -59,7 +73,8 @@ async function updateProduct(req, res) {
           stock = COALESCE($6, stock),
           is_out_of_stock = COALESCE($7, is_out_of_stock),
           description = COALESCE($8, description),
-          image_url = COALESCE($9, image_url)
+          image_url = COALESCE($9, image_url),
+          image_urls = COALESCE($10::jsonb, image_urls)
       WHERE id = $1
       RETURNING *;
       `,
@@ -72,7 +87,8 @@ async function updateProduct(req, res) {
         Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : null,
         typeof is_out_of_stock === 'boolean' ? is_out_of_stock : null,
         requiredString(description) ? description.trim() : null,
-        requiredString(image_url) ? image_url.trim() : null
+        hasImageArray || hasImageUrl ? nextPrimaryImage : null,
+        hasImageArray ? JSON.stringify(normalizedImageUrls) : null
       ]
     );
 

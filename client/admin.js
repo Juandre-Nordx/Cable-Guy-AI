@@ -33,11 +33,28 @@ if (session) {
   bootAdmin();
 }
 
+const TAB_TO_SECTION = {
+  dashboard: 'dashboard-section',
+  users: 'users-section',
+  orders: 'orders-section',
+  products: 'products-section',
+  kits: 'kits-section',
+  services: 'services-section',
+  bookings: 'bookings-section',
+  settings: 'settings-section',
+  wizard: 'wizard-section'
+};
+
 function bindLayoutEvents() {
   document.getElementById('logout-button').addEventListener('click', logout);
 
-  document.querySelectorAll('.admin-nav-link').forEach((button) => {
-    button.addEventListener('click', () => activateSection(button.dataset.target));
+  document.querySelectorAll('.admin-nav-link').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      const targetSection = link.dataset.target || 'dashboard-section';
+      const tabKey = Object.entries(TAB_TO_SECTION).find(([, sectionId]) => sectionId === targetSection)?.[0] || 'dashboard';
+      window.location.assign(`/admin.html?tab=${tabKey}`);
+    });
   });
 
   document.getElementById('refresh-users').addEventListener('click', loadUsers);
@@ -71,11 +88,18 @@ function bindFormEvents() {
 async function bootAdmin() {
   try {
     await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadTechBookings(), loadSettings(), loadWizardBuilder()]);
+    activateSection(getInitialSectionFromQuery());
     setGlobalMessage('Admin dashboard loaded.', 'success');
   } catch (error) {
     console.error('[Admin] boot failed:', error);
     setGlobalMessage(error.message || 'Admin dashboard failed to load.', 'warning');
   }
+}
+
+function getInitialSectionFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab') || 'dashboard';
+  return TAB_TO_SECTION[tab] || 'dashboard-section';
 }
 
 function formatPrice(amount, currency = state.settings.currency || 'ZAR') {

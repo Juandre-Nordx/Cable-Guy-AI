@@ -13,7 +13,17 @@
           <h1>Cable Guy</h1>
           <p class="subtext">Admin Control Center</p>
         </div>
-        <p class="subtext">Use the tabs on the right to switch sections.</p>
+        <nav class="admin-tabs-left" id="admin-nav" aria-label="Admin sections">
+          <a class="admin-nav-link active" data-target="dashboard-section" href="/admin.html?tab=dashboard">Dashboard</a>
+          <a class="admin-nav-link" data-target="users-section" href="/admin.html?tab=users">Users</a>
+          <a class="admin-nav-link" data-target="orders-section" href="/admin.html?tab=orders">Orders</a>
+          <a class="admin-nav-link" data-target="products-section" href="/admin.html?tab=products">Products</a>
+          <a class="admin-nav-link" data-target="kits-section" href="/admin.html?tab=kits">Kits</a>
+          <a class="admin-nav-link" data-target="services-section" href="/admin.html?tab=services">Services</a>
+          <a class="admin-nav-link" data-target="bookings-section" href="/admin.html?tab=bookings">Tech Requests</a>
+          <a class="admin-nav-link" data-target="settings-section" href="/admin.html?tab=settings">System Settings</a>
+          <a class="admin-nav-link" data-target="wizard-section" href="/admin.html?tab=wizard">Wizard Builder</a>
+        </nav>
 
         <button id="logout-button" class="button secondary">Logout</button>
       </aside>
@@ -26,18 +36,6 @@
           </div>
           <p id="global-message" class="subtext"></p>
         </header>
-
-        <nav class="admin-tabs" id="admin-nav" aria-label="Admin sections">
-          <button class="admin-nav-link active" data-target="dashboard-section">Dashboard</button>
-          <button class="admin-nav-link" data-target="users-section">Users</button>
-          <button class="admin-nav-link" data-target="orders-section">Orders</button>
-          <button class="admin-nav-link" data-target="products-section">Products</button>
-          <button class="admin-nav-link" data-target="kits-section">Kits</button>
-          <button class="admin-nav-link" data-target="services-section">Services</button>
-          <button class="admin-nav-link" data-target="bookings-section">Tech Requests</button>
-          <button class="admin-nav-link" data-target="settings-section">System Settings</button>
-          <button class="admin-nav-link" data-target="wizard-section">Wizard Builder</button>
-        </nav>
 
         <section id="dashboard-section" class="admin-section">
           <div class="feature-grid admin-metric-grid">

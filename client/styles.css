@@ -511,7 +511,7 @@ textarea {
 }
 
 .admin-nav-link {
-  text-align: center;
+  text-align: left;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
   padding: 0.58rem 0.78rem;
@@ -520,6 +520,7 @@ textarea {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .admin-nav-link.active {
@@ -528,10 +529,10 @@ textarea {
   color: #fff;
 }
 
-.admin-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
+.admin-tabs-left {
+  display: grid;
+  gap: 0.45rem;
+  overflow-y: auto;
 }
 
 .admin-main {
@@ -635,9 +636,7 @@ select {
     height: auto;
   }
 
-  .admin-tabs {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding-bottom: 0.2rem;
+  .admin-tabs-left {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 }

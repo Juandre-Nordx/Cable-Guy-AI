@@ -49,11 +49,17 @@
       <section class="card" id="custom-cable-calculator">
         <h2>Custom Cable Order Calculator</h2>
         <div class="hero-actions">
-          <label>Price per meter <input id="cable-price" type="number" min="0" step="0.01" value="5.00" /></label>
+          <label>
+            Cable type
+            <select id="cable-type">
+              <option value="indoor">Indoor (R 8.50 / m)</option>
+              <option value="outdoor">Outdoor (R 15.00 / m)</option>
+            </select>
+          </label>
           <label>Meters needed <input id="cable-meters" type="number" min="1" step="1" value="10" /></label>
           <button id="calc-cable" class="button primary" type="button">Calculate</button>
         </div>
-        <p id="cable-total" class="subtext">Estimated total: R 50.00</p>
+        <p id="cable-total" class="subtext">Estimated total: R 85.00</p>
       </section>
 
       <section id="learning-support" class="card">

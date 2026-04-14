@@ -357,12 +357,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   closeDetailsModal();
   await loadStore();
 
-  const priceInput = document.getElementById('cable-price');
+  const CABLE_PRICES = {
+    indoor: 8.5,
+    outdoor: 15
+  };
+
+  const cableTypeInput = document.getElementById('cable-type');
   const metersInput = document.getElementById('cable-meters');
   const totalOutput = document.getElementById('cable-total');
-  document.getElementById('calc-cable')?.addEventListener('click', () => {
-    const price = Number(priceInput?.value || 0);
+  const calculateCableTotal = () => {
+    const cableType = cableTypeInput?.value === 'outdoor' ? 'outdoor' : 'indoor';
+    const price = CABLE_PRICES[cableType];
     const meters = Number(metersInput?.value || 0);
     totalOutput.textContent = `Estimated total: ${formatCurrency(price * meters)}`;
-  });
+  };
+
+  document.getElementById('calc-cable')?.addEventListener('click', calculateCableTotal);
+  cableTypeInput?.addEventListener('change', calculateCableTotal);
+  calculateCableTotal();
 });

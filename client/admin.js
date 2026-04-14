@@ -27,14 +27,6 @@ const state = {
   }
 };
 
-if (session) {
-  const initialSection = getInitialSectionFromQuery();
-  activateSection(initialSection);
-  bindLayoutEvents();
-  bindFormEvents();
-  bootAdmin(initialSection);
-}
-
 const TAB_TO_SECTION = {
   dashboard: 'dashboard-section',
   users: 'users-section',
@@ -46,6 +38,14 @@ const TAB_TO_SECTION = {
   settings: 'settings-section',
   wizard: 'wizard-section'
 };
+
+if (session) {
+  const initialSection = getInitialSectionFromQuery();
+  activateSection(initialSection);
+  bindLayoutEvents();
+  bindFormEvents();
+  bootAdmin(initialSection);
+}
 
 function bindLayoutEvents() {
   document.getElementById('logout-button')?.addEventListener('click', logout);

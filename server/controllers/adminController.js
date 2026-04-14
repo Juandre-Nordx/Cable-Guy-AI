@@ -12,9 +12,40 @@ function sanitizeImageUrls(input) {
   return [...new Set(input.map((entry) => String(entry || '').trim()).filter(Boolean))];
 }
 
+async function upsertProductGuide(client, productId, payload = {}) {
+  const learnHow = requiredString(payload.learn_how) ? payload.learn_how.trim() : '';
+  const installationGuide = requiredString(payload.installation_guide) ? payload.installation_guide.trim() : '';
+  const videoUrl = requiredString(payload.video_url) ? payload.video_url.trim() : null;
+  const hasContent = Boolean(learnHow || installationGuide || videoUrl);
+
+  if (!hasContent) {
+    await client.query('DELETE FROM guides WHERE product_id = $1;', [productId]);
+    return null;
+  }
+
+  const result = await client.query(
+    `
+    INSERT INTO guides (product_id, learn_how, installation_guide, video_url)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (product_id)
+    DO UPDATE SET
+      learn_how = EXCLUDED.learn_how,
+      installation_guide = EXCLUDED.installation_guide,
+      video_url = EXCLUDED.video_url,
+      updated_at = NOW()
+    RETURNING *;
+    `,
+    [productId, learnHow, installationGuide, videoUrl]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function createProduct(req, res) {
   try {
-    const { name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls } = req.body || {};
+    const {
+      name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, learn_how, installation_guide, video_url
+    } = req.body || {};
 
     if (!requiredString(name) || !requiredString(category) || !validateNumber(price) || !validateNumber(cost)) {
       return res.status(400).json({ success: false, error: 'name, category, price, and cost are required.' });
@@ -25,8 +56,11 @@ async function createProduct(req, res) {
 
     const result = await query(
       `
-      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, category_id)
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb,
+        (SELECT id FROM categories WHERE slug = LOWER($2) LIMIT 1)
+      )
       RETURNING *;
       `,
       [
@@ -42,7 +76,9 @@ async function createProduct(req, res) {
       ]
     );
 
-    return res.status(201).json({ success: true, product: result.rows[0] });
+    const product = result.rows[0];
+    const guide = await upsertProductGuide({ query }, product.id, { learn_how, installation_guide, video_url });
+    return res.status(201).json({ success: true, product: { ...product, guide } });
   } catch (error) {
     console.error('[POST /admin/product] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to create product.' });
@@ -52,7 +88,9 @@ async function createProduct(req, res) {
 async function updateProduct(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls } = req.body || {};
+    const {
+      name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, learn_how, installation_guide, video_url
+    } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid product id.' });
@@ -68,6 +106,7 @@ async function updateProduct(req, res) {
       UPDATE products
       SET name = COALESCE($2, name),
           category = COALESCE($3, category),
+          category_id = COALESCE((SELECT id FROM categories WHERE slug = LOWER($3) LIMIT 1), category_id),
           price = COALESCE($4, price),
           cost = COALESCE($5, cost),
           stock = COALESCE($6, stock),
@@ -96,7 +135,9 @@ async function updateProduct(req, res) {
       return res.status(404).json({ success: false, error: 'Product not found.' });
     }
 
-    return res.json({ success: true, product: result.rows[0] });
+    const product = result.rows[0];
+    const guide = await upsertProductGuide({ query }, product.id, { learn_how, installation_guide, video_url });
+    return res.json({ success: true, product: { ...product, guide } });
   } catch (error) {
     console.error('[PUT /admin/product/:id] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to update product.' });
@@ -371,9 +412,20 @@ async function listUsers(req, res) {
   try {
     const result = await query(
       `
-      SELECT id, name, contact_number, email, address, role, created_at
+      SELECT
+        u.id,
+        u.name,
+        u.contact_number,
+        u.email,
+        u.address,
+        u.role,
+        u.created_at,
+        COUNT(o.id)::int AS total_orders,
+        COALESCE(SUM(o.total), 0)::numeric(10,2) AS lifetime_spend
       FROM users
-      ORDER BY created_at DESC;
+      LEFT JOIN orders o ON o.user_id = u.id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC;
       `
     );
     return res.json({ success: true, users: result.rows });
@@ -385,10 +437,12 @@ async function listUsers(req, res) {
 
 async function dashboard(req, res) {
   try {
-    const [usersResult, ordersResult, ordersByStatusResult] = await Promise.all([
+    const [usersResult, ordersResult, ordersByStatusResult, revenueResult, activeUsersResult] = await Promise.all([
       query('SELECT COUNT(*)::int AS count FROM users;'),
       query('SELECT COUNT(*)::int AS count FROM orders;'),
-      query('SELECT status, COUNT(*)::int AS count FROM orders GROUP BY status;')
+      query('SELECT status, COUNT(*)::int AS count FROM orders GROUP BY status;'),
+      query('SELECT COALESCE(SUM(total), 0)::numeric(10,2) AS revenue FROM orders;'),
+      query("SELECT COUNT(DISTINCT user_id)::int AS count FROM orders WHERE created_at >= NOW() - INTERVAL '30 days';")
     ]);
 
     const ordersByStatus = ORDER_STATUSES.reduce((acc, status) => {
@@ -405,7 +459,9 @@ async function dashboard(req, res) {
       stats: {
         total_users: usersResult.rows[0].count,
         total_orders: ordersResult.rows[0].count,
-        orders_by_status: ordersByStatus
+        orders_by_status: ordersByStatus,
+        total_revenue: revenueResult.rows[0].revenue,
+        active_users_30d: activeUsersResult.rows[0].count
       }
     });
   } catch (error) {

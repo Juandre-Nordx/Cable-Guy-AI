@@ -3,17 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cable Guy</title>
+    <title>Cable Guy Online Dashboard</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="top-nav">
-      <a class="brand" href="/index.html">Cable Guy</a>
+      <a class="brand" href="/index.html">Cable Guy Online</a>
       <nav>
-        <a href="/store.html">Store</a>
-        <a href="/cart.html">Cart</a>
-        <a href="/ai.html">Try AI Assistant</a>
-        <a href="/dashboard.html" class="active">My Dashboard</a>
+        <a href="/dashboard.html" class="active" data-tab-link="shop">Shop</a>
+        <a href="/dashboard.html?tab=orders" data-tab-link="orders">My Orders</a>
+        <a href="/dashboard.html?tab=account" data-tab-link="account">My Account</a>
         <a href="#" id="logout-link">Logout</a>
       </nav>
     </header>
@@ -21,39 +20,36 @@
     <main class="narrow">
       <section class="card">
         <h1 id="welcome">Welcome</h1>
-        <p class="subtext">Your Store Dashboard is ready. Use the diagnosis wizard and shop the best-fit kits below.</p>
+        <p class="subtext">Manage shopping, orders, and your account in one place.</p>
       </section>
 
-      <section id="wizard-shell" class="card">
-        <h2>WiFi Diagnosis Wizard</h2>
-        <p class="subtext">Answer a few quick questions and we will recommend the right next step.</p>
+      <section id="shop-tab" class="card">
+        <h2>Shop Front</h2>
+        <p class="subtext">Browse products and kits with built-in learning guides.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="/store.html">Open Full Shop</a>
+          <a class="button secondary" href="/cart.html">View Cart</a>
+        </div>
+      </section>
 
+      <section id="orders-tab" class="card hidden">
+        <h2>My Orders</h2>
+        <div id="orders-list" class="stack-form"></div>
+      </section>
+
+      <section id="account-tab" class="card hidden">
+        <h2>My Account</h2>
+        <p id="account-summary" class="subtext"></p>
+      </section>
+
+      <section id="wizard-shell" class="card hidden">
+        <h2>WiFi Diagnosis Wizard</h2>
         <form id="wizard-form" class="stack-form">
           <h3 id="wizard-question" class="section-subheading">Loading wizard...</h3>
           <div id="wizard-options" class="feature-grid"></div>
           <button id="wizard-reset" class="button secondary" type="button">Restart Wizard</button>
         </form>
-
         <div id="wizard-result" class="hidden wizard-result"></div>
-      </section>
-
-      <section class="card">
-        <h2>Recommended Kits for You</h2>
-        <div id="recommended-kits" class="dashboard-kit-grid"></div>
-      </section>
-
-      <section class="card">
-        <h2>Quick Actions</h2>
-        <div class="quick-actions-grid">
-          <a class="button secondary" href="#orders-section">View Orders</a>
-          <a class="button secondary" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Book Install</a>
-          <a class="button secondary" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Contact Support</a>
-        </div>
-      </section>
-
-      <section id="orders-section" class="card">
-        <h2>My Orders</h2>
-        <div id="orders-list" class="stack-form"></div>
       </section>
     </main>
 

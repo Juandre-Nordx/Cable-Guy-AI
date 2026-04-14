@@ -48,7 +48,7 @@ const TAB_TO_SECTION = {
 };
 
 function bindLayoutEvents() {
-  document.getElementById('logout-button').addEventListener('click', logout);
+  document.getElementById('logout-button')?.addEventListener('click', logout);
 
   document.querySelectorAll('.admin-nav-link').forEach((link) => {
     link.addEventListener('click', (event) => {
@@ -60,33 +60,33 @@ function bindLayoutEvents() {
     });
   });
 
-  document.getElementById('refresh-users').addEventListener('click', loadUsers);
-  document.getElementById('refresh-orders').addEventListener('click', loadOrders);
-  document.getElementById('order-status-filter').addEventListener('change', renderOrdersTable);
-  document.getElementById('refresh-products').addEventListener('click', loadProducts);
-  document.getElementById('refresh-kits').addEventListener('click', loadKits);
-  document.getElementById('refresh-services').addEventListener('click', loadServices);
-  document.getElementById('refresh-bookings').addEventListener('click', loadTechBookings);
-  document.getElementById('refresh-settings').addEventListener('click', loadSettings);
-  document.getElementById('refresh-wizard').addEventListener('click', loadWizardBuilder);
-  document.getElementById('wizard-add-node').addEventListener('click', createWizardNodeDraft);
-  document.getElementById('wizard-add-connection').addEventListener('click', handleAddConnection);
-  document.getElementById('wizard-node-add-connection').addEventListener('click', handleAddNodeConnection);
-  document.getElementById('wizard-connection-filter').addEventListener('change', handleConnectionFilterChange);
+  document.getElementById('refresh-users')?.addEventListener('click', loadUsers);
+  document.getElementById('refresh-orders')?.addEventListener('click', loadOrders);
+  document.getElementById('order-status-filter')?.addEventListener('change', renderOrdersTable);
+  document.getElementById('refresh-products')?.addEventListener('click', loadProducts);
+  document.getElementById('refresh-kits')?.addEventListener('click', loadKits);
+  document.getElementById('refresh-services')?.addEventListener('click', loadServices);
+  document.getElementById('refresh-bookings')?.addEventListener('click', loadTechBookings);
+  document.getElementById('refresh-settings')?.addEventListener('click', loadSettings);
+  document.getElementById('refresh-wizard')?.addEventListener('click', loadWizardBuilder);
+  document.getElementById('wizard-add-node')?.addEventListener('click', createWizardNodeDraft);
+  document.getElementById('wizard-add-connection')?.addEventListener('click', handleAddConnection);
+  document.getElementById('wizard-node-add-connection')?.addEventListener('click', handleAddNodeConnection);
+  document.getElementById('wizard-connection-filter')?.addEventListener('change', handleConnectionFilterChange);
   document.querySelectorAll('[data-wizard-tab]').forEach((tab) => tab.addEventListener('click', () => activateWizardTab(tab.dataset.wizardTab)));
 }
 
 function bindFormEvents() {
-  document.getElementById('product-form').addEventListener('submit', submitProduct);
-  document.getElementById('kit-form').addEventListener('submit', submitKit);
-  document.getElementById('service-form').addEventListener('submit', submitService);
-  document.getElementById('settings-form').addEventListener('submit', submitSettings);
-  document.getElementById('wizard-node-form').addEventListener('submit', submitWizardNode);
-  document.getElementById('wizard-delete-node').addEventListener('click', deleteWizardNodeBySelection);
-  document.querySelector('#wizard-node-form select[name="type"]').addEventListener('change', toggleWizardResultFields);
-  document.getElementById('product-cancel-edit').addEventListener('click', () => resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit'));
-  document.getElementById('kit-cancel-edit').addEventListener('click', () => resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit'));
-  document.getElementById('service-cancel-edit').addEventListener('click', () => resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit'));
+  document.getElementById('product-form')?.addEventListener('submit', submitProduct);
+  document.getElementById('kit-form')?.addEventListener('submit', submitKit);
+  document.getElementById('service-form')?.addEventListener('submit', submitService);
+  document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
+  document.getElementById('wizard-node-form')?.addEventListener('submit', submitWizardNode);
+  document.getElementById('wizard-delete-node')?.addEventListener('click', deleteWizardNodeBySelection);
+  document.querySelector('#wizard-node-form select[name="type"]')?.addEventListener('change', toggleWizardResultFields);
+  document.getElementById('product-cancel-edit')?.addEventListener('click', () => resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit'));
+  document.getElementById('kit-cancel-edit')?.addEventListener('click', () => resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit'));
+  document.getElementById('service-cancel-edit')?.addEventListener('click', () => resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit'));
 }
 
 async function bootAdmin(initialSection = 'dashboard-section') {

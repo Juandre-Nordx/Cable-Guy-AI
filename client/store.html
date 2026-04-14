@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cable Guy</title>
+    <title>Cable Guy Online Store</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="top-nav">
-      <a class="brand" href="/index.html">Cable Guy</a>
+      <a class="brand" href="/index.html">Cable Guy Online</a>
       <nav>
         <a href="/index.html">Home</a>
-        <a href="/store.html" class="active">Store</a>
+        <a href="/store.html" class="active">Shop</a>
         <a href="/cart.html">Cart</a>
         <a href="/dashboard.html">My Dashboard</a>
       </nav>
@@ -19,11 +19,16 @@
 
     <main class="store-sections">
       <section class="store-heading card">
-        <h1>Store</h1>
-        <p class="subtext">Browse products, kits, and services. Add what you want to your cart and checkout in one flow.</p>
+        <h1>Shop Front</h1>
+        <p class="subtext">Networking Kits, CCTV Kits, UPS / Power Backup, Custom Cables, Accessories, and Services.</p>
       </section>
 
-      <section>
+      <section class="card">
+        <h2>Shop Categories</h2>
+        <div id="category-pills" class="hero-actions"></div>
+      </section>
+
+      <section id="kit-category">
         <div class="section-header-row">
           <h2>Networking Kits</h2>
           <a class="button secondary" href="/cart.html">View Cart</a>
@@ -32,13 +37,28 @@
       </section>
 
       <section>
-        <h2>Products</h2>
+        <h2>Products & Accessories</h2>
         <div id="product-grid" class="product-grid"></div>
       </section>
 
       <section>
         <h2>Services</h2>
         <div id="service-grid" class="product-grid"></div>
+      </section>
+
+      <section class="card" id="custom-cable-calculator">
+        <h2>Custom Cable Order Calculator</h2>
+        <div class="hero-actions">
+          <label>Price per meter <input id="cable-price" type="number" min="0" step="0.01" value="5.00" /></label>
+          <label>Meters needed <input id="cable-meters" type="number" min="1" step="1" value="10" /></label>
+          <button id="calc-cable" class="button primary" type="button">Calculate</button>
+        </div>
+        <p id="cable-total" class="subtext">Estimated total: R 50.00</p>
+      </section>
+
+      <section id="learning-support" class="card">
+        <h2>DIY Learning Support</h2>
+        <p class="subtext">Every product includes “📘 Learn How It Works” and “🛠 Installation Guide”.</p>
       </section>
     </main>
 

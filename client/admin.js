@@ -62,6 +62,7 @@ function bindLayoutEvents() {
 
   document.getElementById('refresh-users').addEventListener('click', loadUsers);
   document.getElementById('refresh-orders').addEventListener('click', loadOrders);
+  document.getElementById('order-status-filter').addEventListener('change', renderOrdersTable);
   document.getElementById('refresh-products').addEventListener('click', loadProducts);
   document.getElementById('refresh-kits').addEventListener('click', loadKits);
   document.getElementById('refresh-services').addEventListener('click', loadServices);
@@ -206,6 +207,8 @@ async function loadDashboard() {
   document.getElementById('orders-by-status').textContent = JSON.stringify(dashboardPayload.stats.orders_by_status, null, 2);
   document.getElementById('total-products').textContent = productsPayload.products?.length || 0;
   document.getElementById('total-kits').textContent = kitsPayload.kits?.length || 0;
+  document.getElementById('total-revenue').textContent = formatPrice(dashboardPayload.stats.total_revenue, state.settings.currency);
+  document.getElementById('active-users-30d').textContent = dashboardPayload.stats.active_users_30d || 0;
 }
 
 async function loadUsers() {
@@ -223,6 +226,8 @@ function renderUsersTable() {
         <td>${user.email}</td>
         <td>${user.contact_number || '-'}</td>
         <td><span class="role-chip">${user.role}</span></td>
+        <td>${user.total_orders || 0}</td>
+        <td>${formatPrice(user.lifetime_spend || 0)}</td>
         <td>${new Date(user.created_at).toLocaleString()}</td>
       </tr>
     `
@@ -230,7 +235,7 @@ function renderUsersTable() {
     .join('');
 
   document.getElementById('users-table-wrap').innerHTML = state.users.length
-    ? `<table><thead><tr><th>Name</th><th>Email</th><th>Contact</th><th>Role</th><th>Created</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>Name</th><th>Email</th><th>Contact</th><th>Role</th><th>Orders</th><th>Lifetime Spend</th><th>Created</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No users found.</p>';
 }
 
@@ -249,7 +254,9 @@ function renderAdminOrderItems(items = [], currency = state.settings.currency ||
 }
 
 function renderOrdersTable() {
-  const rows = state.orders
+  const selectedStatus = document.getElementById('order-status-filter')?.value || 'all';
+  const orders = selectedStatus === 'all' ? state.orders : state.orders.filter((order) => order.status === selectedStatus);
+  const rows = orders
     .map(
       (order) => `
       <tr>
@@ -287,7 +294,7 @@ function renderOrdersTable() {
     )
     .join('');
 
-  document.getElementById('orders-table-wrap').innerHTML = state.orders.length
+  document.getElementById('orders-table-wrap').innerHTML = orders.length
     ? `<table><thead><tr><th>Order ID</th><th>User</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No orders found.</p>';
 
@@ -427,7 +434,10 @@ async function submitProduct(event) {
       is_out_of_stock: formData.get('is_out_of_stock') === 'on',
       description: formData.get('description')?.toString().trim() || '',
       image_url: imageUrls[0] || null,
-      image_urls: imageUrls
+      image_urls: imageUrls,
+      learn_how: formData.get('learn_how')?.toString().trim() || '',
+      installation_guide: formData.get('installation_guide')?.toString().trim() || '',
+      video_url: formData.get('video_url')?.toString().trim() || null
     };
 
     await apiFetch(editId ? `/admin/product/${editId}` : '/admin/product', {
@@ -781,6 +791,9 @@ function startEditProduct(id) {
   form.elements.stock.value = product.stock ?? 0;
   form.elements.is_out_of_stock.checked = Boolean(product.is_out_of_stock);
   form.elements.description.value = product.description || '';
+  form.elements.learn_how.value = product.guide?.learn_how || '';
+  form.elements.installation_guide.value = product.guide?.installation_guide || '';
+  form.elements.video_url.value = product.guide?.video_url || '';
   document.getElementById('product-save-button').textContent = 'Update Product';
   document.getElementById('product-cancel-edit').classList.remove('hidden');
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });

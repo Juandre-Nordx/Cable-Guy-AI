@@ -43,6 +43,8 @@
             <article class="card admin-metric-card"><h3>Total Orders</h3><p id="total-orders">0</p></article>
             <article class="card admin-metric-card"><h3>Total Products</h3><p id="total-products">0</p></article>
             <article class="card admin-metric-card"><h3>Total Kits</h3><p id="total-kits">0</p></article>
+            <article class="card admin-metric-card"><h3>Revenue</h3><p id="total-revenue">R0.00</p></article>
+            <article class="card admin-metric-card"><h3>Active Users (30d)</h3><p id="active-users-30d">0</p></article>
           </div>
           <article class="card mt-16">
             <h3>Orders by Status</h3>
@@ -64,6 +66,16 @@
           <article class="card">
             <div class="section-header-row">
               <h3>Orders</h3>
+              <label>Filter Status
+                <select id="order-status-filter">
+                  <option value="all">all</option>
+                  <option value="placed">placed</option>
+                  <option value="processing">processing</option>
+                  <option value="out_for_delivery">out_for_delivery</option>
+                  <option value="delivered">delivered</option>
+                  <option value="done">done</option>
+                </select>
+              </label>
               <button class="button secondary" id="refresh-orders">Refresh</button>
             </div>
             <div id="orders-table-wrap"></div>
@@ -86,6 +98,9 @@
                 Mark as Out of Stock
               </label>
               <label>Photos<input type="file" name="image" accept="image/png,image/jpeg,image/webp" multiple /></label>
+              <label>📘 Learn How It Works<textarea name="learn_how" rows="3" placeholder="Explain core use and concepts"></textarea></label>
+              <label>🛠 Installation Guide<textarea name="installation_guide" rows="4" placeholder="Step-by-step install instructions"></textarea></label>
+              <label>YouTube Video URL<input type="url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." /></label>
               <p class="subtext">You can upload multiple photos for each product.</p>
               <div class="kit-card-actions">
                 <button class="button primary" type="submit" id="product-save-button">Save Product</button>

@@ -1,13 +1,15 @@
 const kitGrid = document.getElementById('kit-grid');
 const productGrid = document.getElementById('product-grid');
 const serviceGrid = document.getElementById('service-grid');
+const categoryPills = document.getElementById('category-pills');
 const detailsModal = document.getElementById('detailsModal');
 const detailsModalBody = document.getElementById('details-modal-body');
 
 const state = {
   kits: [],
   products: [],
-  services: []
+  services: [],
+  categories: []
 };
 
 function escapeHtml(text = '') {
@@ -84,9 +86,12 @@ function renderStoreCard(item, type, isRecommended = false) {
     ${imageMarkup}
     <h3>${escapeHtml(item.name)}</h3>
     <p class="subtext">${escapeHtml(item.description || '')}</p>
+    ${item.category_name ? `<p><strong>Category:</strong> ${escapeHtml(item.category_name)}</p>` : ''}
     <p><strong>Price:</strong> ${formatCurrency(item.price, item.currency)}</p>
     ${canTrackStock ? `<p><span class="stock-badge ${isOutOfStock ? 'out' : 'in'}">${isOutOfStock ? '❌ Out of Stock' : '✅ In Stock'}</span></p>` : ''}
     <div class="kit-card-actions">
+      <button class="button secondary details-btn" type="button" data-id="${item.id}" data-type="${type}" data-focus="learn">📘 Learn How It Works</button>
+      <button class="button secondary details-btn" type="button" data-id="${item.id}" data-type="${type}" data-focus="install">🛠 Installation Guide</button>
       <button class="button secondary details-btn" type="button" data-id="${item.id}" data-type="${type}">More Details</button>
       <button
         class="button primary add-to-cart-btn"
@@ -100,6 +105,7 @@ function renderStoreCard(item, type, isRecommended = false) {
       >
         Add to Cart
       </button>
+      <a class="button outline" href="https://wa.me/27825551234" target="_blank" rel="noreferrer">Request Installation Help</a>
     </div>
   `;
 
@@ -201,6 +207,11 @@ function openDetailsModal(item, type = 'product') {
 
   document.getElementById('details-modal-title').textContent = item.name || 'Details';
 
+  const guide = item.guide || {};
+  const learnHow = item.learn_how || guide.learn_how;
+  const installationGuide = item.installation_guide || guide.installation_guide || item.instructions;
+  const videoUrl = item.video_url || guide.video_url;
+
   detailsModalBody.innerHTML = `
     ${getItemImageSources(item, type)
       .map(
@@ -215,12 +226,14 @@ function openDetailsModal(item, type = 'product') {
       )
       .join('')}
     <p class="details-description">${escapeHtml(item.description || '')}</p>
-    ${item.video_url ? `<p class="details-video-link"><a href="${item.video_url}" target="_blank" rel="noopener noreferrer">▶ Watch video guide</a></p>` : ''}
+    <h4 class="details-section-title">📘 Learn How It Works</h4>
+    <p>${escapeHtml(learnHow || 'This item includes practical setup knowledge and usage tips.')}</p>
+    <h4 class="details-section-title">🛠 Installation Guide</h4>
+    <p>${escapeHtml(installationGuide || 'Follow the included guide or request installation support.')}</p>
+    ${videoUrl ? `<p class="details-video-link"><a href="${videoUrl}" target="_blank" rel="noopener noreferrer">▶ Watch video guide</a></p>` : ''}
     ${hasSteps
       ? renderSteps(item.steps)
-      : hasInstructions
-        ? `<h4 class="details-section-title">Instructions</h4><p>${escapeHtml(item.instructions)}</p>`
-        : '<p class="subtext">No instructions available for this item.</p>'
+      : hasInstructions ? `<h4 class="details-section-title">Instructions</h4><p>${escapeHtml(item.instructions)}</p>` : ''
     }
   `;
 
@@ -252,17 +265,20 @@ async function openDetails(id, type) {
 
 async function loadStore() {
   try {
-    const [kitsRes, productsRes, servicesRes] = await Promise.all([fetch('/kits'), fetch('/products'), fetch('/services')]);
-    const [kitsPayload, productsPayload, servicesPayload] = await Promise.all([kitsRes.json(), productsRes.json(), servicesRes.json()]);
+    const [kitsRes, productsRes, servicesRes, categoriesRes] = await Promise.all([fetch('/kits'), fetch('/products'), fetch('/services'), fetch('/categories')]);
+    const [kitsPayload, productsPayload, servicesPayload, categoriesPayload] = await Promise.all([kitsRes.json(), productsRes.json(), servicesRes.json(), categoriesRes.json()]);
 
     if (!kitsRes.ok) throw new Error(kitsPayload.error || 'Unable to load kits.');
     if (!productsRes.ok) throw new Error(productsPayload.error || 'Unable to load products.');
     if (!servicesRes.ok) throw new Error(servicesPayload.error || 'Unable to load services.');
+    if (!categoriesRes.ok) throw new Error(categoriesPayload.error || 'Unable to load categories.');
 
     state.kits = kitsPayload.kits || [];
     state.products = productsPayload.products || [];
     state.services = servicesPayload.services || [];
+    state.categories = categoriesPayload.categories || [];
 
+    renderCategoryPills(state.categories);
     renderKits(state.kits);
     renderProducts(state.products);
     renderServices(state.services);
@@ -273,6 +289,18 @@ async function loadStore() {
     productGrid.innerHTML = message;
     serviceGrid.innerHTML = message;
   }
+}
+
+function renderCategoryPills(categories = []) {
+  if (!categoryPills) return;
+  if (!categories.length) {
+    categoryPills.innerHTML = '<span class="subtext">Categories unavailable.</span>';
+    return;
+  }
+
+  categoryPills.innerHTML = categories
+    .map((category) => `<span class="button secondary">${escapeHtml(category.name)}</span>`)
+    .join('');
 }
 
 function wireEvents() {
@@ -328,4 +356,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireEvents();
   closeDetailsModal();
   await loadStore();
+
+  const priceInput = document.getElementById('cable-price');
+  const metersInput = document.getElementById('cable-meters');
+  const totalOutput = document.getElementById('cable-total');
+  document.getElementById('calc-cable')?.addEventListener('click', () => {
+    const price = Number(priceInput?.value || 0);
+    const meters = Number(metersInput?.value || 0);
+    totalOutput.textContent = `Estimated total: ${formatCurrency(price * meters)}`;
+  });
 });

@@ -245,3 +245,68 @@ WHERE NOT EXISTS (
   FROM kits k
   WHERE k.category = sk.category
 );
+
+CREATE TABLE IF NOT EXISTS categories (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO categories (name, slug, description, sort_order)
+VALUES
+  ('Networking Kits', 'networking-kits', 'Pre-built kits for home and business networking.', 1),
+  ('CCTV Kits', 'cctv-kits', 'Camera systems, NVR bundles, and surveillance packs.', 2),
+  ('UPS / Power Backup', 'ups-power-backup', 'Power continuity solutions for routers, DVRs, and networks.', 3),
+  ('Custom Cables', 'custom-cables', 'Cut-to-length cabling with per-meter pricing.', 4),
+  ('Accessories', 'accessories', 'Routers, switches, cameras, and mounting accessories.', 5),
+  ('Services', 'services', 'Installation, support, and maintenance services.', 6)
+ON CONFLICT (slug) DO UPDATE
+SET
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  sort_order = EXCLUDED.sort_order;
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;
+
+UPDATE products
+SET category_id = c.id
+FROM categories c
+WHERE products.category_id IS NULL
+  AND (
+    LOWER(products.category) = c.slug
+    OR LOWER(products.category) = REPLACE(c.slug, '-', ' ')
+    OR LOWER(products.category) = REPLACE(c.name, ' / ', ' ')
+  );
+
+UPDATE kits
+SET category_id = c.id
+FROM categories c
+WHERE kits.category_id IS NULL
+  AND (
+    (kits.category = 'security' AND c.slug = 'cctv-kits')
+    OR (kits.category = 'backup' AND c.slug = 'ups-power-backup')
+    OR (kits.category IN ('home', 'bridge', 'business', 'smart', 'infrastructure') AND c.slug = 'networking-kits')
+  );
+
+UPDATE services
+SET category_id = c.id
+FROM categories c
+WHERE services.category_id IS NULL
+  AND c.slug = 'services';
+
+CREATE TABLE IF NOT EXISTS guides (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER NOT NULL UNIQUE REFERENCES products(id) ON DELETE CASCADE,
+  learn_how TEXT NOT NULL DEFAULT '',
+  installation_guide TEXT NOT NULL DEFAULT '',
+  video_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS guides_product_id_idx ON guides(product_id);

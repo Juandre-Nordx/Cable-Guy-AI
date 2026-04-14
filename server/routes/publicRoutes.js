@@ -119,9 +119,20 @@ router.get('/products', async (_req, res) => {
           'ZAR'
         ) AS currency
       )
-      SELECT p.*, cc.currency
+      SELECT
+        p.*,
+        cc.currency,
+        c.name AS category_name,
+        c.slug AS category_slug,
+        json_build_object(
+          'learn_how', COALESCE(g.learn_how, ''),
+          'installation_guide', COALESCE(g.installation_guide, ''),
+          'video_url', g.video_url
+        ) AS guide
       FROM products p
       CROSS JOIN current_currency cc
+      LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN guides g ON g.product_id = p.id
       ORDER BY p.id DESC;
       `
     );
@@ -129,6 +140,23 @@ router.get('/products', async (_req, res) => {
   } catch (error) {
     console.error('[GET /products] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to load products.' });
+  }
+});
+
+router.get('/categories', async (_req, res) => {
+  try {
+    const result = await query(
+      `
+      SELECT id, name, slug, description, sort_order
+      FROM categories
+      ORDER BY sort_order ASC, name ASC;
+      `
+    );
+
+    return res.json({ success: true, categories: result.rows });
+  } catch (error) {
+    console.error('[GET /categories] Failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to load categories.' });
   }
 });
 

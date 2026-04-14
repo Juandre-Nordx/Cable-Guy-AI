@@ -28,10 +28,11 @@ const state = {
 };
 
 if (session) {
-  activateSection(getInitialSectionFromQuery());
+  const initialSection = getInitialSectionFromQuery();
+  activateSection(initialSection);
   bindLayoutEvents();
   bindFormEvents();
-  bootAdmin();
+  bootAdmin(initialSection);
 }
 
 const TAB_TO_SECTION = {
@@ -53,8 +54,9 @@ function bindLayoutEvents() {
     link.addEventListener('click', (event) => {
       event.preventDefault();
       const targetSection = link.dataset.target || 'dashboard-section';
-      const tabKey = Object.entries(TAB_TO_SECTION).find(([, sectionId]) => sectionId === targetSection)?.[0] || 'dashboard';
-      window.location.assign(`/admin.html?tab=${tabKey}`);
+      activateSection(targetSection);
+      refreshUrlTab(targetSection);
+      void loadSectionData(targetSection);
     });
   });
 
@@ -86,14 +88,65 @@ function bindFormEvents() {
   document.getElementById('service-cancel-edit').addEventListener('click', () => resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit'));
 }
 
-async function bootAdmin() {
-  try {
-    await Promise.all([loadDashboard(), loadUsers(), loadOrders(), loadProducts(), loadKits(), loadServices(), loadTechBookings(), loadSettings(), loadWizardBuilder()]);
-    activateSection(getInitialSectionFromQuery());
+async function bootAdmin(initialSection = 'dashboard-section') {
+  const startupTasks = [
+    { label: 'dashboard', run: loadDashboard },
+    { label: 'users', run: loadUsers },
+    { label: 'orders', run: loadOrders },
+    { label: 'products', run: loadProducts },
+    { label: 'kits', run: loadKits },
+    { label: 'services', run: loadServices },
+    { label: 'bookings', run: loadTechBookings },
+    { label: 'settings', run: loadSettings },
+    { label: 'wizard', run: loadWizardBuilder }
+  ];
+
+  const results = await Promise.allSettled(startupTasks.map((task) => task.run()));
+  const failedTasks = results
+    .map((result, index) => ({ result, label: startupTasks[index].label }))
+    .filter(({ result }) => result.status === 'rejected');
+
+  activateSection(initialSection);
+
+  if (!failedTasks.length) {
     setGlobalMessage('Admin dashboard loaded.', 'success');
+    return;
+  }
+
+  console.error('[Admin] boot failed tasks:', failedTasks);
+  setGlobalMessage(`Admin loaded with ${failedTasks.length} warning(s): ${failedTasks.map((item) => item.label).join(', ')}.`, 'warning');
+}
+
+
+function refreshUrlTab(sectionId) {
+  const tabKey = Object.entries(TAB_TO_SECTION).find(([, candidateSection]) => candidateSection === sectionId)?.[0] || 'dashboard';
+  const params = new URLSearchParams(window.location.search);
+  params.set('tab', tabKey);
+  const nextUrl = `${window.location.pathname}?${params.toString()}`;
+  window.history.replaceState({}, '', nextUrl);
+}
+
+async function loadSectionData(sectionId) {
+  const loaders = {
+    'dashboard-section': loadDashboard,
+    'users-section': loadUsers,
+    'orders-section': loadOrders,
+    'products-section': loadProducts,
+    'kits-section': loadKits,
+    'services-section': loadServices,
+    'bookings-section': loadTechBookings,
+    'settings-section': loadSettings,
+    'wizard-section': loadWizardBuilder
+  };
+
+  const loader = loaders[sectionId];
+  if (!loader) return;
+
+  try {
+    await loader();
   } catch (error) {
-    console.error('[Admin] boot failed:', error);
-    setGlobalMessage(error.message || 'Admin dashboard failed to load.', 'warning');
+    console.error(`[Admin] failed loading section ${sectionId}:`, error);
+    setGlobalMessage(error.message || 'Failed to load section data.', 'warning');
   }
 }
 

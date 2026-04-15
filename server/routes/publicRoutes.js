@@ -24,6 +24,7 @@ router.get('/kits', async (_req, res) => {
         k.description,
         k.instructions,
         k.image_url,
+        k.main_image,
         k.video_url,
         k.created_at,
         COALESCE(
@@ -33,7 +34,8 @@ router.get('/kits', async (_req, res) => {
               'step_number', ks.step_number,
               'title', ks.title,
               'description', ks.description,
-              'image_url', ks.image_url
+              'image', COALESCE(ks.image, ks.image_url),
+              'image_url', COALESCE(ks.image, ks.image_url)
             )
             ORDER BY ks.step_number
           ) FILTER (WHERE ks.id IS NOT NULL),
@@ -75,6 +77,7 @@ router.get('/kits/:id', async (req, res) => {
         k.description,
         k.instructions,
         k.image_url,
+        k.main_image,
         k.video_url,
         COALESCE(
           json_agg(
@@ -83,7 +86,8 @@ router.get('/kits/:id', async (req, res) => {
               'step_number', ks.step_number,
               'title', ks.title,
               'description', ks.description,
-              'image_url', ks.image_url
+              'image', COALESCE(ks.image, ks.image_url),
+              'image_url', COALESCE(ks.image, ks.image_url)
             )
             ORDER BY ks.step_number
           ) FILTER (WHERE ks.id IS NOT NULL),
@@ -121,6 +125,7 @@ router.get('/products', async (_req, res) => {
       )
       SELECT
         p.*,
+        COALESCE(p.main_image, p.image_url) AS main_image,
         cc.currency,
         c.name AS category_name,
         c.slug AS category_slug,

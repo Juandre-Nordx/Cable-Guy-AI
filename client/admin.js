@@ -44,6 +44,7 @@ if (session) {
   activateSection(initialSection);
   bindLayoutEvents();
   bindFormEvents();
+  renderKitStepEditorRows([]);
   bootAdmin(initialSection);
 }
 
@@ -87,6 +88,7 @@ function bindFormEvents() {
   document.getElementById('product-cancel-edit')?.addEventListener('click', () => resetEntityForm('product-form', 'product-save-button', 'Save Product', 'product-cancel-edit'));
   document.getElementById('kit-cancel-edit')?.addEventListener('click', () => resetEntityForm('kit-form', 'kit-save-button', 'Save Kit', 'kit-cancel-edit'));
   document.getElementById('service-cancel-edit')?.addEventListener('click', () => resetEntityForm('service-form', 'service-save-button', 'Save Service', 'service-cancel-edit'));
+  document.getElementById('add-kit-step')?.addEventListener('click', () => appendKitStepEditor());
 }
 
 async function bootAdmin(initialSection = 'dashboard-section') {
@@ -416,13 +418,12 @@ async function submitProduct(event) {
   const formData = new FormData(form);
   const editId = Number(formData.get('id') || 0);
 
-  const images = formData.getAll('image').filter((file) => file && file.size > 0);
-  let imageUrls = [];
+  const image = formData.get('image');
+  let imageUrl = null;
 
   try {
-    if (images.length) {
-      imageUrls = await Promise.all(images.map((image) => uploadImage(image, 'products')));
-      console.log('[Admin] images uploaded:', imageUrls);
+    if (image && image.size > 0) {
+      imageUrl = await uploadImage(image, 'products');
     }
 
     const productPayload = {
@@ -433,12 +434,15 @@ async function submitProduct(event) {
       stock: Number(formData.get('stock') || 0),
       is_out_of_stock: formData.get('is_out_of_stock') === 'on',
       description: formData.get('description')?.toString().trim() || '',
-      image_url: imageUrls[0] || null,
-      image_urls: imageUrls,
       learn_how: formData.get('learn_how')?.toString().trim() || '',
       installation_guide: formData.get('installation_guide')?.toString().trim() || '',
       video_url: formData.get('video_url')?.toString().trim() || null
     };
+    if (imageUrl) {
+      productPayload.main_image = imageUrl;
+      productPayload.image_url = imageUrl;
+      productPayload.image_urls = [imageUrl];
+    }
 
     await apiFetch(editId ? `/admin/product/${editId}` : '/admin/product', {
       method: editId ? 'PUT' : 'POST',
@@ -463,12 +467,31 @@ async function submitKit(event) {
   const editId = Number(data.get('id') || 0);
 
   let imageUrl = '';
+  const stepRows = [...document.querySelectorAll('.kit-step-editor-row')];
 
   try {
     const image = data.get('image');
     if (image && image.size > 0) {
       imageUrl = await uploadImage(image, 'kits');
     }
+
+    const steps = await Promise.all(
+      stepRows.map(async (row, index) => {
+        const imageInput = row.querySelector('input[name="step_image"]');
+        const existingImage = row.querySelector('input[name="step_existing_image"]')?.value || '';
+        let stepImage = existingImage || null;
+        if (imageInput?.files?.[0] && imageInput.files[0].size > 0) {
+          stepImage = await uploadImage(imageInput.files[0], 'steps');
+        }
+
+        return {
+          step_number: Number(row.querySelector('input[name="step_number"]')?.value || index + 1),
+          title: row.querySelector('input[name="step_title"]')?.value?.trim() || '',
+          description: row.querySelector('textarea[name="step_description"]')?.value?.trim() || '',
+          image: stepImage
+        };
+      })
+    );
 
     const payload = {
       name: data.get('name')?.toString().trim(),
@@ -480,9 +503,13 @@ async function submitKit(event) {
       requires_technician: data.get('requires_technician') === 'on',
       description: data.get('description')?.toString().trim() || '',
       instructions: data.get('instructions')?.toString().trim() || '',
-      image_url: imageUrl || null,
+      steps: steps.filter((step) => step.title),
       video_url: data.get('video_url')?.toString().trim() || null
     };
+    if (imageUrl) {
+      payload.main_image = imageUrl;
+      payload.image_url = imageUrl;
+    }
 
     await apiFetch(editId ? `/admin/kit/${editId}` : '/admin/kit', {
       method: editId ? 'PUT' : 'POST',
@@ -584,7 +611,7 @@ function renderProductsTable() {
         <td>${product.category}</td>
         <td>${formatPrice(product.price, product.currency)}</td>
         <td>${Number(product.stock) > 0 && !product.is_out_of_stock ? '✅ In Stock' : '❌ Out of Stock'}</td>
-        <td>${Array.isArray(product.image_urls) && product.image_urls.length ? `${product.image_urls.length} photos` : product.image_url ? '1 photo' : '-'}</td>
+        <td>${product.main_image || product.image_url ? 'Main image' : '-'}</td>
         <td>
           <div class="admin-order-actions">
             <button class="button secondary" type="button" data-edit-product="${product.id}">Edit</button>
@@ -597,7 +624,7 @@ function renderProductsTable() {
     .join('');
 
   document.getElementById('products-table-wrap').innerHTML = state.products.length
-    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Photos</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+    ? `<table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Main Image</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="subtext">No products found.</p>';
 
   document.querySelectorAll('[data-edit-product]').forEach((button) => {
@@ -630,7 +657,7 @@ function renderKitsTable() {
         <td>${kit.difficulty}</td>
         <td>${kit.requires_technician ? 'Yes' : 'No'}</td>
         <td>${kit.instructions ? 'Included' : '-'}</td>
-        <td>${kit.image_url ? `<a href="${kit.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
+        <td>${(kit.main_image || kit.image_url) ? `<a href="${kit.main_image || kit.image_url}" target="_blank" rel="noopener noreferrer">Image</a>` : '-'}</td>
         <td>${kit.video_url ? `<a href="${kit.video_url}" target="_blank" rel="noopener noreferrer">Video</a>` : '-'}</td>
         <td>
           <div class="admin-order-actions">
@@ -777,6 +804,10 @@ function resetEntityForm(formId, saveButtonId, defaultLabel, cancelButtonId) {
   if (saveButton) saveButton.textContent = defaultLabel;
   const cancelButton = document.getElementById(cancelButtonId);
   cancelButton?.classList.add('hidden');
+  if (formId === 'kit-form') {
+    const container = document.getElementById('kit-steps-editor');
+    if (container) container.innerHTML = '';
+  }
 }
 
 function startEditProduct(id) {
@@ -825,9 +856,42 @@ function startEditKit(id) {
   form.elements.description.value = kit.description || '';
   form.elements.instructions.value = kit.instructions || '';
   form.elements.video_url.value = kit.video_url || '';
+  renderKitStepEditorRows(kit.steps || []);
   document.getElementById('kit-save-button').textContent = 'Update Kit';
   document.getElementById('kit-cancel-edit').classList.remove('hidden');
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderKitStepEditorRows(steps = []) {
+  const container = document.getElementById('kit-steps-editor');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!steps.length) {
+    appendKitStepEditor();
+    return;
+  }
+  steps
+    .sort((a, b) => Number(a.step_number) - Number(b.step_number))
+    .forEach((step) => appendKitStepEditor(step));
+}
+
+function appendKitStepEditor(step = {}) {
+  const container = document.getElementById('kit-steps-editor');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'kit-step-editor-row card';
+  row.innerHTML = `
+    <label>Step Number<input type="number" name="step_number" min="1" step="1" value="${Number(step.step_number) || container.children.length + 1}" /></label>
+    <label>Step Title<input type="text" name="step_title" value="${escapeHtml(step.title || '')}" placeholder="Mount the router" /></label>
+    <label>Step Description<textarea name="step_description" rows="2" placeholder="Describe the action">${escapeHtml(step.description || '')}</textarea></label>
+    <label>Step Image<input type="file" name="step_image" accept="image/png,image/jpeg,image/webp" /></label>
+    <input type="hidden" name="step_existing_image" value="${escapeHtml(step.image || step.image_url || '')}" />
+    ${(step.image || step.image_url) ? `<a href="${step.image || step.image_url}" target="_blank" rel="noopener noreferrer">Current image</a>` : ''}
+    <button type="button" class="button secondary remove-kit-step">Remove Step</button>
+  `;
+  row.querySelector('.remove-kit-step')?.addEventListener('click', () => row.remove());
+  container.appendChild(row);
 }
 
 async function deleteKit(id) {

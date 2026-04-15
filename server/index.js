@@ -15,9 +15,12 @@ const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
 
-if (!fs.existsSync(config.uploadDir)) {
-  fs.mkdirSync(config.uploadDir, { recursive: true });
-}
+['', 'products', 'kits', 'steps', 'services', 'common'].forEach((subdir) => {
+  const targetDir = subdir ? path.join(config.uploadDir, subdir) : config.uploadDir;
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+});
 
 app.use(cors());
 app.get('/health', (_req, res) => {

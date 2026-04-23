@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS products (
   is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE,
   description TEXT NOT NULL DEFAULT '',
   image_url TEXT,
+  main_image TEXT,
   image_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -38,18 +39,21 @@ CREATE TABLE IF NOT EXISTS kits (
   description TEXT NOT NULL DEFAULT '',
   instructions TEXT NOT NULL DEFAULT '',
   image_url TEXT,
+  main_image TEXT,
   video_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS instructions TEXT NOT NULL DEFAULT '';
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE kits ADD COLUMN IF NOT EXISTS main_image TEXT;
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS video_url TEXT;
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE kits ADD COLUMN IF NOT EXISTS is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_out_of_stock BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS main_image TEXT;
 
 -- Backward-safe migration for renamed kit field
 DO $$
@@ -96,9 +100,19 @@ CREATE TABLE IF NOT EXISTS kit_steps (
   step_number INTEGER NOT NULL CHECK (step_number > 0),
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
+  image TEXT,
   image_url TEXT,
   UNIQUE (kit_id, step_number)
 );
+ALTER TABLE kit_steps ADD COLUMN IF NOT EXISTS image TEXT;
+ALTER TABLE kit_steps ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE kit_steps ADD COLUMN IF NOT EXISTS step_number INTEGER DEFAULT 1;
+ALTER TABLE kit_steps DROP CONSTRAINT IF EXISTS kit_steps_step_number_check;
+ALTER TABLE kit_steps ADD CONSTRAINT kit_steps_step_number_check CHECK (step_number > 0);
+
+UPDATE products SET main_image = image_url WHERE main_image IS NULL AND image_url IS NOT NULL;
+UPDATE kits SET main_image = image_url WHERE main_image IS NULL AND image_url IS NOT NULL;
+UPDATE kit_steps SET image = image_url WHERE image IS NULL AND image_url IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS services (
   id SERIAL PRIMARY KEY,

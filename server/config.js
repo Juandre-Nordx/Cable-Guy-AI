@@ -15,7 +15,7 @@ module.exports = {
   ollamaTimeoutMs: toNumber(process.env.OLLAMA_TIMEOUT_MS, 45000),
   maxUserMessageLength: toNumber(process.env.MAX_USER_MESSAGE_LENGTH, 2000),
   maxAiReplyLength: toNumber(process.env.MAX_AI_REPLY_LENGTH, 2500),
-  uploadDir: process.env.UPLOAD_DIR || '/uploads',
+  uploadDir: process.env.UPLOAD_DIR || '/data/uploads',
   uploadUrlBase: process.env.UPLOAD_URL_BASE || '/uploads',
   clientDir: path.join(__dirname, '..', 'client'),
   superAdminEmail: process.env.SUPER_ADMIN_EMAIL || '',

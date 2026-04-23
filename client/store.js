@@ -124,6 +124,7 @@ function normalizeImageValue(value) {
 
 function getItemImageSources(item, type) {
   const candidates = [
+    item.main_image,
     ...normalizeImageValue(item.image_urls),
     ...normalizeImageValue(item.images),
     item.image_url,
@@ -192,7 +193,7 @@ function renderSteps(steps) {
           <div class="kit-step-body">
             <strong class="kit-step-title">${escapeHtml(s.title)}</strong>
             <p class="kit-step-desc">${escapeHtml(s.description || '')}</p>
-            ${s.image_url ? `<img src="${s.image_url}" alt="${escapeHtml(s.title)}" class="kit-step-image" loading="lazy" />` : ''}
+            ${(s.image || s.image_url) ? `<img src="${s.image || s.image_url}" alt="${escapeHtml(s.title)}" class="kit-step-image" loading="lazy" />` : ''}
           </div>
         </li>`
         )

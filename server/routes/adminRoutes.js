@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const config = require('../config');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const {
@@ -32,13 +33,18 @@ const {
 } = require('../controllers/adminController');
 const { listAllOrders, updateOrderStatus, createAdminOrderNote } = require('../controllers/orderController');
 
-if (!fs.existsSync(config.uploadDir)) {
-  fs.mkdirSync(config.uploadDir, { recursive: true });
+const UPLOAD_SUBDIRS = new Set(['products', 'kits', 'steps', 'services', 'common']);
+for (const subdir of UPLOAD_SUBDIRS) {
+  const targetDir = path.join(config.uploadDir, subdir);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
 }
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const uploadSubdir = req.params.type || req.body?.type || 'common';
+    const requestedSubdir = String(req.params.type || req.body?.type || 'common').toLowerCase();
+    const uploadSubdir = UPLOAD_SUBDIRS.has(requestedSubdir) ? requestedSubdir : 'common';
     const targetDir = path.join(config.uploadDir, uploadSubdir);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
@@ -46,8 +52,9 @@ const storage = multer.diskStorage({
     cb(null, targetDir);
   },
   filename: (_req, file, cb) => {
-    const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${Date.now()}-${safeOriginal}`);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const randomToken = crypto.randomBytes(6).toString('hex');
+    cb(null, `${Date.now()}-${randomToken}${ext}`);
   }
 });
 

@@ -1,4 +1,4 @@
-const { query } = require('../models/db');
+const { query, pool } = require('../models/db');
 const { requiredString, validateEnum, validateNumber } = require('../middleware/validate');
 const { ORDER_STATUSES } = require('./orderController');
 
@@ -10,6 +10,52 @@ const RECOMMENDED_ITEM_TYPES = ['product', 'kit', 'service'];
 function sanitizeImageUrls(input) {
   if (!Array.isArray(input)) return [];
   return [...new Set(input.map((entry) => String(entry || '').trim()).filter(Boolean))];
+}
+
+function normalizeUploadPath(input) {
+  if (!requiredString(input)) return null;
+  const raw = input.trim();
+  if (raw.startsWith('/uploads/')) return raw;
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname.startsWith('/uploads/')) {
+      return parsed.pathname;
+    }
+  } catch (_error) {
+    return raw.startsWith('/') ? raw : `/${raw}`;
+  }
+
+  return raw.startsWith('/') ? raw : `/${raw}`;
+}
+
+function sanitizeKitSteps(input) {
+  if (!Array.isArray(input)) return null;
+
+  return input
+    .map((step) => ({
+      step_number: Number(step?.step_number),
+      title: requiredString(step?.title) ? step.title.trim() : '',
+      description: requiredString(step?.description) ? step.description.trim() : '',
+      image: normalizeUploadPath(step?.image || step?.image_url)
+    }))
+    .filter((step) => Number.isInteger(step.step_number) && step.step_number > 0 && step.title)
+    .sort((a, b) => a.step_number - b.step_number);
+}
+
+async function replaceKitSteps(client, kitId, steps) {
+  await client.query('DELETE FROM kit_steps WHERE kit_id = $1;', [kitId]);
+  if (!steps?.length) return;
+
+  for (const step of steps) {
+    await client.query(
+      `
+      INSERT INTO kit_steps (kit_id, step_number, title, description, image, image_url)
+      VALUES ($1, $2, $3, $4, $5, $5);
+      `,
+      [kitId, step.step_number, step.title, step.description, step.image]
+    );
+  }
 }
 
 async function upsertProductGuide(client, productId, payload = {}) {
@@ -44,7 +90,7 @@ async function upsertProductGuide(client, productId, payload = {}) {
 async function createProduct(req, res) {
   try {
     const {
-      name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, learn_how, installation_guide, video_url
+      name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, main_image, learn_how, installation_guide, video_url
     } = req.body || {};
 
     if (!requiredString(name) || !requiredString(category) || !validateNumber(price) || !validateNumber(cost)) {
@@ -52,13 +98,13 @@ async function createProduct(req, res) {
     }
 
     const normalizedImageUrls = sanitizeImageUrls(image_urls);
-    const primaryImageUrl = image_url?.trim() || normalizedImageUrls[0] || null;
+    const primaryImageUrl = normalizeUploadPath(main_image || image_url?.trim() || normalizedImageUrls[0] || null);
 
     const result = await query(
       `
-      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, category_id)
+      INSERT INTO products (name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, main_image, category_id)
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb,
+        $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10,
         (SELECT id FROM categories WHERE slug = LOWER($2) LIMIT 1)
       )
       RETURNING *;
@@ -72,7 +118,8 @@ async function createProduct(req, res) {
         Boolean(is_out_of_stock),
         description?.trim() || '',
         primaryImageUrl,
-        JSON.stringify(normalizedImageUrls)
+        JSON.stringify(normalizedImageUrls),
+        primaryImageUrl
       ]
     );
 
@@ -89,7 +136,7 @@ async function updateProduct(req, res) {
   try {
     const id = Number(req.params.id);
     const {
-      name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, learn_how, installation_guide, video_url
+      name, category, price, cost, stock, is_out_of_stock, description, image_url, image_urls, main_image, learn_how, installation_guide, video_url
     } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -98,8 +145,8 @@ async function updateProduct(req, res) {
 
     const normalizedImageUrls = sanitizeImageUrls(image_urls);
     const hasImageArray = Array.isArray(image_urls);
-    const hasImageUrl = requiredString(image_url);
-    const nextPrimaryImage = hasImageUrl ? image_url.trim() : normalizedImageUrls[0] || null;
+    const hasImageUrl = requiredString(image_url) || requiredString(main_image);
+    const nextPrimaryImage = hasImageUrl ? normalizeUploadPath(main_image || image_url) : normalizedImageUrls[0] || null;
 
     const result = await query(
       `
@@ -113,7 +160,8 @@ async function updateProduct(req, res) {
           is_out_of_stock = COALESCE($7, is_out_of_stock),
           description = COALESCE($8, description),
           image_url = COALESCE($9, image_url),
-          image_urls = COALESCE($10::jsonb, image_urls)
+          image_urls = COALESCE($10::jsonb, image_urls),
+          main_image = COALESCE($11, main_image)
       WHERE id = $1
       RETURNING *;
       `,
@@ -127,7 +175,8 @@ async function updateProduct(req, res) {
         typeof is_out_of_stock === 'boolean' ? is_out_of_stock : null,
         requiredString(description) ? description.trim() : null,
         hasImageArray || hasImageUrl ? nextPrimaryImage : null,
-        hasImageArray ? JSON.stringify(normalizedImageUrls) : null
+        hasImageArray ? JSON.stringify(normalizedImageUrls) : null,
+        hasImageArray || hasImageUrl ? nextPrimaryImage : null
       ]
     );
 
@@ -161,7 +210,7 @@ async function deleteProduct(req, res) {
 async function createKit(req, res) {
   try {
     const {
-      name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, video_url
+      name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, main_image, video_url, steps
     } = req.body || {};
 
     if (
@@ -177,28 +226,41 @@ async function createKit(req, res) {
       });
     }
 
-    const result = await query(
-      `
-      INSERT INTO kits (name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, video_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING *;
-      `,
-      [
-        name.trim(),
-        category,
-        price,
-        Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : 0,
-        Boolean(is_out_of_stock),
-        difficulty.trim(),
-        requires_technician,
-        description?.trim() || '',
-        instructions?.trim() || '',
-        image_url?.trim() || null,
-        video_url?.trim() || null
-      ]
-    );
-
-    return res.status(201).json({ success: true, kit: result.rows[0] });
+    const mainImage = normalizeUploadPath(main_image || image_url);
+    const parsedSteps = sanitizeKitSteps(steps);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `
+        INSERT INTO kits (name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, main_image, video_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11)
+        RETURNING *;
+        `,
+        [
+          name.trim(),
+          category,
+          price,
+          Number.isInteger(Number(stock)) && Number(stock) >= 0 ? Number(stock) : 0,
+          Boolean(is_out_of_stock),
+          difficulty.trim(),
+          requires_technician,
+          description?.trim() || '',
+          instructions?.trim() || '',
+          mainImage,
+          video_url?.trim() || null
+        ]
+      );
+      const kit = result.rows[0];
+      await replaceKitSteps(client, kit.id, parsedSteps);
+      await client.query('COMMIT');
+      return res.status(201).json({ success: true, kit });
+    } catch (innerError) {
+      await client.query('ROLLBACK');
+      throw innerError;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'Kit category already exists.' });
@@ -212,12 +274,17 @@ async function updateKit(req, res) {
   try {
     const id = Number(req.params.id);
     const {
-      name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, video_url
+      name, category, price, stock, is_out_of_stock, difficulty, requires_technician, description, instructions, image_url, main_image, video_url, steps
     } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid kit id.' });
     }
+
+    const parsedSteps = sanitizeKitSteps(steps);
+    const hasSteps = Array.isArray(steps);
+    const hasMainImage = requiredString(main_image) || requiredString(image_url);
+    const mainImage = hasMainImage ? normalizeUploadPath(main_image || image_url) : null;
 
     const result = await query(
       `
@@ -232,6 +299,7 @@ async function updateKit(req, res) {
           description = COALESCE($9, description),
           instructions = COALESCE($10, instructions),
           image_url = COALESCE($11, image_url),
+          main_image = COALESCE($11, main_image),
           video_url = COALESCE($12, video_url)
       WHERE id = $1
       RETURNING *;
@@ -247,7 +315,7 @@ async function updateKit(req, res) {
         typeof requires_technician === 'boolean' ? requires_technician : null,
         requiredString(description) ? description.trim() : null,
         requiredString(instructions) ? instructions.trim() : null,
-        requiredString(image_url) ? image_url.trim() : null,
+        hasMainImage ? mainImage : null,
         requiredString(video_url) ? video_url.trim() : null
       ]
     );
@@ -256,7 +324,22 @@ async function updateKit(req, res) {
       return res.status(404).json({ success: false, error: 'Kit not found.' });
     }
 
-    return res.json({ success: true, kit: result.rows[0] });
+    const kit = result.rows[0];
+    if (hasSteps) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await replaceKitSteps(client, kit.id, parsedSteps);
+        await client.query('COMMIT');
+      } catch (innerError) {
+        await client.query('ROLLBACK');
+        throw innerError;
+      } finally {
+        client.release();
+      }
+    }
+
+    return res.json({ success: true, kit });
   } catch (error) {
     console.error('[PUT /admin/kit/:id] Failed:', error.message);
     return res.status(500).json({ success: false, error: 'Failed to update kit.' });
@@ -476,8 +559,8 @@ async function uploadImage(req, res) {
   }
 
   const uploadSubdir = req.params.type || 'common';
-  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${uploadSubdir}/${req.file.filename}`;
-  return res.status(201).json({ success: true, imageUrl });
+  const imageUrl = `/uploads/${uploadSubdir}/${req.file.filename}`;
+  return res.status(201).json({ success: true, imageUrl, path: imageUrl });
 }
 
 async function getAdminSettings(_req, res) {

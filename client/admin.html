@@ -97,11 +97,11 @@
                 <input type="checkbox" name="is_out_of_stock" />
                 Mark as Out of Stock
               </label>
-              <label>Photos<input type="file" name="image" accept="image/png,image/jpeg,image/webp" multiple /></label>
+              <label>Main Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
               <label>📘 Learn How It Works<textarea name="learn_how" rows="3" placeholder="Explain core use and concepts"></textarea></label>
               <label>🛠 Installation Guide<textarea name="installation_guide" rows="4" placeholder="Step-by-step install instructions"></textarea></label>
               <label>YouTube Video URL<input type="url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." /></label>
-              <p class="subtext">You can upload multiple photos for each product.</p>
+              <p class="subtext">Upload one main product image.</p>
               <div class="kit-card-actions">
                 <button class="button primary" type="submit" id="product-save-button">Save Product</button>
                 <button class="button secondary hidden" type="button" id="product-cancel-edit">Cancel</button>
@@ -158,6 +158,14 @@
               </label>
               <label>Instructions<textarea name="instructions" rows="5" placeholder="Installation and setup guidance"></textarea></label>
               <label>Installation Image<input type="file" name="image" accept="image/png,image/jpeg,image/webp" /></label>
+              <div class="card">
+                <div class="section-header-row">
+                  <h4>Installation Steps</h4>
+                  <button type="button" class="button secondary" id="add-kit-step">Add Step</button>
+                </div>
+                <div id="kit-steps-editor" class="stack-form"></div>
+                <p class="subtext">Each step supports title, description, step number, and image upload.</p>
+              </div>
               <label>Video URL<input type="url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." /></label>
               <div class="kit-card-actions">
                 <button class="button primary" type="submit" id="kit-save-button">Save Kit</button>
